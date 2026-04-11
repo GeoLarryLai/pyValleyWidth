@@ -5,4 +5,5 @@ The functions were trainslated from Paul Morgan's codes (https://github.com/PMon
 
 Morgan, P. M., Grant, A., Struble, W., LaHusen, S., and Duvall, A.: The damability function: A probabilistic approach to regional landslide dam susceptibility analysis applied to the Oregon Coast Range, USA, EGUsphere [preprint], https://doi.org/10.5194/egusphere-2025-580, 2025.
 
+Below is the method overview, captured from Morgan et al. (in review)
 ![Method_overview](./Method_overview.png)
