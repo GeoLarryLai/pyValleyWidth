@@ -13,7 +13,8 @@ from .swath_width import swath_width
 
 
 def dem2widths(dem, streamarea, elevthreshold, swath_dx, minradius,
-              swath_width_param, units='pixels', plot=False):
+              swath_width_param, units='pixels', plot=False,
+              klargest_conncomps=None):
     """Full pipeline from DEM to valley-width measurements.
 
     Parameters
@@ -35,6 +36,11 @@ def dem2widths(dem, streamarea, elevthreshold, swath_dx, minradius,
         Units for *streamarea*: ``'pixels'`` (default), ``'m2'``, etc.
     plot : bool, optional
         If True, show diagnostic plots during valley classification.
+    klargest_conncomps : int, optional
+        If set (e.g. ``1``), after ``removeshortstreams`` keep only the *k* largest
+        connected stream components (``StreamObject.klargestconncomps``), matching
+        the main-basin workflow in the Mataian notebook. If ``None`` (default), all
+        components on the DEM are retained.
 
     Returns
     -------
@@ -59,6 +65,12 @@ def dem2widths(dem, streamarea, elevthreshold, swath_dx, minradius,
     # --- Remove short streams ---
     print("Removing short streams")
     S = removeshortstreams(S, minradius)
+
+    if klargest_conncomps is not None:
+        k = int(klargest_conncomps)
+        if k > 0:
+            print(f"Restricting to {k} largest connected stream component(s)")
+            S = S.klargestconncomps(k)
 
     # --- Valley classification ---
     print("Classifying valley")
