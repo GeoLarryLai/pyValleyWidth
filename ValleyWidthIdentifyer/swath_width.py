@@ -28,11 +28,15 @@ def swath_width(swath_profiles, minradius):
     Returns
     -------
     np.ndarray
-        (N x 4) array where columns are:
+        (N x 5) array where columns are:
         0 - x coordinate of profile center,
         1 - y coordinate of profile center,
         2 - raw valley width,
-        3 - minimum width within *minradius*.
+        3 - minimum width within *minradius*,
+        4 - saturated flag (1 if the transect never hit a hillslope on at
+            least one side within ``swath.width / 2``; 0 otherwise). NaN /
+            off-grid samples are treated as out-of-valley, so masked edges
+            no longer inflate widths.
     """
     all_stream_widths = []
 
@@ -44,25 +48,29 @@ def swath_width(swath_profiles, minradius):
         half_width = total_width / 2.0
         n_profiles = xy.shape[0]
 
-        widths_this_stream = np.zeros((n_profiles, 4))
+        widths_this_stream = np.zeros((n_profiles, 5))
 
         for pp in range(n_profiles):
             profile_vals = Z[:, pp]
 
-            # Out-of-valley: classification < 1 (i.e. 0 = hillslope)
-            out_of_valley = profile_vals < 1.0
+            # Out-of-valley: classification < 1 (hillslope) OR non-finite
+            # (NaN from off-grid / masked NoData pixels acts as valley wall).
+            out_of_valley = (profile_vals < 1.0) | ~np.isfinite(profile_vals)
             out_dists = disty[out_of_valley]
 
             pos_dists = out_dists[out_dists > 0]
             neg_dists = out_dists[out_dists < 0]
 
+            saturated_pos = len(pos_dists) == 0
+            saturated_neg = len(neg_dists) == 0
+
             # If profile never leaves valley on one side, cap at half_width
-            if len(pos_dists) == 0:
+            if saturated_pos:
                 min_pos = half_width
             else:
                 min_pos = np.min(pos_dists)
 
-            if len(neg_dists) == 0:
+            if saturated_neg:
                 min_neg = half_width
             else:
                 min_neg = np.min(np.abs(neg_dists))
@@ -73,6 +81,7 @@ def swath_width(swath_profiles, minradius):
             widths_this_stream[pp, 1] = xy[pp, 1]
             widths_this_stream[pp, 2] = valley_w
             widths_this_stream[pp, 3] = 0.0  # placeholder
+            widths_this_stream[pp, 4] = 1.0 if (saturated_pos or saturated_neg) else 0.0
 
         # Moving-minimum smoothing per stream
         if n_profiles > 0:
@@ -86,6 +95,6 @@ def swath_width(swath_profiles, minradius):
         all_stream_widths.append(widths_this_stream)
 
     if len(all_stream_widths) == 0:
-        return np.empty((0, 4))
+        return np.empty((0, 5))
 
     return np.vstack(all_stream_widths)

@@ -61,7 +61,7 @@ def plot_stream_ksn(
 ):
     """Hillshade + stream nodes colored by *ksn_values* (same walk order as ``calculate_ksn``)."""
     fig, ax = plt.subplots(figsize=figsize)
-    dem.plot_hs(ax=ax, cmap='gray', norm=mcolors.Normalize(vmin=0, vmax=np.nanmax(np.asarray(dem))))
+    dem.plot_hs(ax=ax, cmap='gray', norm=mcolors.Normalize(vmin=np.nanmin(np.asarray(dem)), vmax=np.nanmax(np.asarray(dem))))
 
     xy_coords = stream_obj.xy()
     idx = 0
@@ -80,7 +80,7 @@ def plot_stream_ksn(
         x_coords, y_coords = zip(*coord_group)
         scatter = ax.scatter(
             x_coords, y_coords, c=ksn_vals,
-            cmap='jet', s=5, vmin=vmin, vmax=ksn_vmax,
+            cmap='viridis', s=5, vmin=vmin, vmax=ksn_vmax,
             edgecolors='none', alpha=0.8,
         )
 
@@ -191,7 +191,7 @@ def plot_longitudinal_trunk_colored_ksn(
         ksn_vmax = np.nanmax(ksn_plot)
 
     sc = ax.scatter(
-        trunk_dist_km, st_z, c=ksn_plot, cmap='jet',
+        trunk_dist_km, st_z, c=ksn_plot, cmap='viridis',
         s=8, vmin=vmin, vmax=ksn_vmax, alpha=1, linewidths=0, edgecolors='none', zorder=5,
     )
     if theta is not None:
@@ -223,6 +223,7 @@ def plot_longitudinal_trunk_ksn_valley_width_twin(
     vw_outline_sigma_pts=4.0,
     ksn_vmin=0,
     ksn_vmax=None,
+    ksn_clim=None,
     valleywidth_ylim=None,
     figsize=(16, 6),
     savefig=None,
@@ -267,9 +268,16 @@ def plot_longitudinal_trunk_ksn_valley_width_twin(
     ksn_st_smoothed = ksn_st_smoothed[:min_len]
     vw_trunk_smooth_nal = np.asarray(vw_trunk_smooth_nal[:min_len], dtype=np.float64)
 
-    _ksn_vmax = ksn_vmax
-    if ksn_vmax is None:
+    # ksn_clim (vmin, vmax) overrides ksn_vmin/ksn_vmax when provided.
+    if ksn_clim is not None:
+        _ksn_vmin, _ksn_vmax = ksn_clim
+    else:
+        _ksn_vmin = ksn_vmin
+        _ksn_vmax = ksn_vmax
+    if _ksn_vmax is None:
         _ksn_vmax = np.nanmax(ksn_st_smoothed)
+    if _ksn_vmin is None:
+        _ksn_vmin = 0
 
     mask_close = dists_aw < max_match_dist
     print(f'Valley width points matched to s2 network: {mask_close.sum()} / {len(dists_aw)}')
@@ -341,9 +349,9 @@ def plot_longitudinal_trunk_ksn_valley_width_twin(
         trunk_dist_km,
         st_z,
         c=ksn_st_smoothed,
-        cmap='jet',
+        cmap='viridis',
         s=8,
-        vmin=ksn_vmin,
+        vmin=_ksn_vmin,
         vmax=_ksn_vmax,
         linewidths=0,
         edgecolors='none',
@@ -439,7 +447,7 @@ def plot_chi_z_trunk_colored_gray_network(
         linewidths=0, edgecolors='none', zorder=1,
     )
     sc = ax.scatter(
-        st_chi, st_z, c=ksn_st_smoothed, cmap='jet',
+        st_chi, st_z, c=ksn_st_smoothed, cmap='viridis',
         s=8, vmin=vmin, vmax=ksn_vmax, alpha=0.7, linewidths=0, edgecolors='none', zorder=5,
     )
     if theta is not None:
@@ -535,7 +543,7 @@ def plot_chi_z_trunk_ksn_valley_width_twin(
 
     fig, ax_chi = plt.subplots(figsize=figsize)
     sc1 = ax_chi.scatter(
-        trunk_chi, trunk_z, c=trunk_ksn, cmap='jet',
+        trunk_chi, trunk_z, c=trunk_ksn, cmap='viridis',
         s=8, vmin=ksn_vmin, vmax=_ksn_vmax, linewidths=0, edgecolors='none',
         zorder=3, alpha=0.9,
     )
