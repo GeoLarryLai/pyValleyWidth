@@ -16,19 +16,11 @@ from .valley_width_stream import trunk_valley_width_from_s2_field, valley_width_
 def _network_longprofile_dist_km_z(S_all, dem):
     """Outlet-distance (km) and elevation at each stream node (Mataian all-stream scatter).
 
-    Uses the same ``streamquad_trapz_f32`` integration as ``plotdz``/Mataian long-profile
-    code, but returns one point per node so branches plot as a point cloud instead of
-    separate polylines.
+    ``S.distance()`` is already a node-attribute list of cumulative upstream distance
+    from the outlet (in metres), so we use it directly — no edge integration needed.
     """
-    from topotoolbox import _stream
-
     s_z = S_all.ezgetnal(dem)
-    dist_m = np.zeros_like(s_z, dtype=np.float32)
-    one = np.ones_like(s_z, dtype=np.float32)
-    _stream.streamquad_trapz_f32(
-        dist_m, one, S_all.source, S_all.target, S_all.distance()
-    )
-    x_km = np.asarray(dist_m / 1000.0, dtype=np.float64)
+    x_km = np.asarray(S_all.distance(), dtype=np.float64) / 1000.0
     z_m = np.asarray(s_z, dtype=np.float64)
     n = min(len(x_km), len(z_m))
     return x_km[:n], z_m[:n]
@@ -109,16 +101,11 @@ def plot_longitudinal_trunk_colored_ksn(
 ):
     """Gray branches as in χ–Z: point per branch colored node, trunk colored by k_sn by distance."""
 
-    from topotoolbox import _stream
-
-    # Compute all stream nodes' distances (network, not polylines)
+    # Per-node cumulative upstream distance (m) from ``S.distance()`` — already the
+    # correct node-attribute list, no trapz integration needed.
     s2_z = S_all.ezgetnal(dem)
-    dist_s2_m = np.zeros_like(s2_z, dtype=np.float32)
-    one = np.ones_like(s2_z, dtype=np.float32)
-    _stream.streamquad_trapz_f32(
-        dist_s2_m, one, S_all.source, S_all.target, S_all.distance()
-    )
-    all_dist_km = np.asarray(dist_s2_m / 1000.0, dtype=np.float64)
+    dist_s2_m = np.asarray(S_all.distance(), dtype=np.float64)
+    all_dist_km = dist_s2_m / 1000.0
     all_z = np.asarray(s2_z, dtype=np.float64)
 
     # Branches: panel-style as in plot_chi_z_trunk_colored_gray_network
@@ -129,7 +116,7 @@ def plot_longitudinal_trunk_colored_ksn(
         st_trunk_nodes = set(getattr(S_all.trunk(), 'nodes', []))
     # Compose per-branch node indices via xy
     s2_z = S_all.ezgetnal(dem)
-    s2_dist = np.asarray(dist_s2_m / 1000.0, dtype=np.float64)
+    s2_dist = all_dist_km
     groups = S_all.xy(data=(s2_dist, s2_z))
 
     background_dist = []
@@ -171,14 +158,9 @@ def plot_longitudinal_trunk_colored_ksn(
         zorder=1,
     )
 
-    # Trunk
+    # Trunk: per-node upstream distance from outlet (m → km)
     st_z = st_trunk.ezgetnal(dem)
-    dist_trunk = np.zeros_like(st_z, dtype=np.float32)
-    a = np.ones_like(st_z, dtype=np.float32)
-    _stream.streamquad_trapz_f32(
-        dist_trunk, a, st_trunk.source, st_trunk.target, st_trunk.distance()
-    )
-    trunk_dist_km = dist_trunk / 1000.0
+    trunk_dist_km = np.asarray(st_trunk.distance(), dtype=np.float64) / 1000.0
 
     min_len = min(len(trunk_dist_km), len(st_z), len(ksn_st_smoothed))
     trunk_dist_km = trunk_dist_km[:min_len]
@@ -236,13 +218,8 @@ def plot_longitudinal_trunk_ksn_valley_width_twin(
     ``trunk_valley_width_from_s2_field``, then drawn in ``st.xy`` segment order with a light
     Gaussian on the outline.
     """
-    from topotoolbox import _stream
-
     st_z = np.asarray(st.ezgetnal(dem), dtype=float)
-    dist_trunk = np.zeros_like(st_z, dtype=np.float32)
-    a_ones = np.ones_like(st_z, dtype=np.float32)
-    _stream.streamquad_trapz_f32(dist_trunk, a_ones, st.source, st.target, st.distance())
-    trunk_dist_km = dist_trunk / 1000.0
+    trunk_dist_km = np.asarray(st.distance(), dtype=np.float64) / 1000.0
 
     ksn_st = calculate_ksn(st, dem_imposed, acc, theta)
     ksn_st_smoothed = smooth_stream_values(st, ksn_st, window_size=ksn_window)
@@ -294,18 +271,9 @@ def plot_longitudinal_trunk_ksn_valley_width_twin(
 
     fig, ax_main = plt.subplots(figsize=figsize)
 
-    # --- REWRITE of gray branches plotting to follow the style of plot_longitudinal_trunk_colored_ksn and plot_chi_z_trunk_colored_gray_network ---
-
-    # Compute all stream nodes' distances (network, not polylines)
-    from topotoolbox import _stream
-
+    # Per-node upstream distance on the s2 network (metres) for the gray background.
     s2_z = s2.ezgetnal(dem)
-    dist_s2_m = np.zeros_like(s2_z, dtype=np.float32)
-    one = np.ones_like(s2_z, dtype=np.float32)
-    _stream.streamquad_trapz_f32(
-        dist_s2_m, one, s2.source, s2.target, s2.distance()
-    )
-    all_dist_km = np.asarray(dist_s2_m / 1000.0, dtype=np.float64)
+    all_dist_km = np.asarray(s2.distance(), dtype=np.float64) / 1000.0
     all_z = np.asarray(s2_z, dtype=np.float64)
 
     # Plot all branches as faint gray points (excluding trunk)
@@ -313,7 +281,7 @@ def plot_longitudinal_trunk_ksn_valley_width_twin(
     if not st_trunk_nodes:
         st_trunk_nodes = set(getattr(s2.trunk(), 'nodes', []))
     s2_z = s2.ezgetnal(dem)
-    s2_dist = np.asarray(dist_s2_m / 1000.0, dtype=np.float64)
+    s2_dist = all_dist_km
     groups = s2.xy(data=(s2_dist, s2_z))
     background_dist = []
     background_z = []
