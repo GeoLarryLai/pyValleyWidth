@@ -1,0 +1,12 @@
+# pyValleyWidth: only track these publish paths (everything else in this folder stays local)
+/*
+!/.gitignore
+!/README.md
+!/Method_overview.png
+!/valley_width_example.ipynb
+!/ValleyWidthIdentifyer/
+
+ValleyWidthIdentifyer/__pycache__/
+ValleyWidthIdentifyer/**/*.pyc
+ValleyWidthIdentifyer/Untitled
+.DS_Store
