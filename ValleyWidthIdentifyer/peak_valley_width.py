@@ -1,32 +1,31 @@
-"""Per-transect valley-edge detection via Kneedle on HAND profiles.
+"""Per-transect valley-edge detection via fraction-of-peak HAND.
 
-For each cross-stream profile, walk outward from the channel on each bank
-along the height-above-nearest-drainage (HAND) profile, identify the
-dominant outward peak (the ridge with the largest HAND), and locate the
-``knee`` of the rising portion leading up to it using a simplified
-Kneedle algorithm.  That knee is the valley *edge* on that bank: the
-transition from the flat/gently-dipping valley floor to the rising
-hillslope.
+For each cross-stream profile, each bank's HAND profile is scanned
+outward from the channel; the *dominant* outward ridge (tallest HAND
+peak meeting ``peak_min_prominence``) is identified, and the valley
+*rim* on that bank is defined as the HAND value
+``rim_fraction * H_peak``.  The per-transect valley-depth threshold is
+the minimum of the two bank rims (the lower rim controls, since water
+would spill over it).
 
-The two bank edges define a per-transect valley depth
-``threshold = min(HAND_left_edge, HAND_right_edge)`` (the lower rim
-controls, since water would spill over it).  These thresholds, varying
-along the channel, are then painted into a spatially-varying valley
-classification grid (``DV``): pixels with ``HAND < threshold_of_nearest_
-profile`` are marked valley.  Widths are subsequently measured from that
-``DV`` by the standard :func:`swath_width`, so the widths and the DV
-polygon are always consistent.
+These per-transect thresholds are then interpolated onto the *dense*
+stream-node array (one threshold per stream cell) and smoothed along
+the channel with a NaN-aware rolling median.  Every DEM pixel is
+assigned the threshold of its nearest stream node, so the Voronoi
+tiles in the threshold raster shrink to a single pixel and the DV
+boundary becomes a smooth iso-HAND contour (same character as the
+``max_valley_width=False`` flood-fill, but with a threshold that
+varies along the channel).  The valley classification grid is built by
+thresholding HAND against that per-pixel threshold and keeping only
+connected components reachable from the stream - identical logic to
+:func:`valleyclass_elev.valleyclass_elev`, just with a variable rather
+than scalar threshold.
 """
 
 import copy
 
 import numpy as np
-from scipy.ndimage import (
-    binary_closing,
-    binary_fill_holes,
-    label,
-    uniform_filter1d,
-)
+from scipy.ndimage import label, uniform_filter1d
 from scipy.signal import find_peaks
 from scipy.spatial import cKDTree
 
@@ -35,130 +34,49 @@ from scipy.spatial import cKDTree
 # Low-level helpers
 # ---------------------------------------------------------------------------
 
-def _knee_index_kneedle(y, S=1.0):
-    """Simplified Kneedle knee finder for a concave-increasing curve.
+def _rim_hand_for_bank(h, smooth_win=0, prominence=0.0, rim_fraction=0.8):
+    """Valley-rim HAND on one bank of a HAND profile.
 
-    Parameters
-    ----------
-    y : array_like
-        1-D array assumed to be (roughly) concave-increasing from ``y[0]``
-        at the channel to ``y[-1]`` at the peak.  The corresponding
-        ``x`` axis is taken to be ``arange(len(y))``.
-    S : float, optional
-        Sensitivity gate on the normalised distance-from-diagonal. Higher
-        ``S`` requires a more pronounced knee before one is reported.
-        Default 1.0.
-
-    Returns
-    -------
-    int or None
-        Index of the knee within ``y``, or ``None`` if the curve is too
-        short / too straight / non-finite.
-    """
-    y = np.asarray(y, dtype=np.float64)
-    n = y.size
-    if n < 3 or not np.isfinite(y).all():
-        return None
-
-    yr = y.max() - y.min()
-    xr = float(n - 1)
-    if yr <= 0 or xr <= 0:
-        return None
-
-    xn = np.arange(n, dtype=np.float64) / xr
-    yn = (y - y.min()) / yr
-
-    # For a concave-increasing curve, the knee is where the curve is
-    # furthest above the chord (the y=x diagonal after normalisation).
-    d = yn - xn
-    i = int(np.argmax(d))
-    if i == 0 or i == n - 1:
-        return None
-
-    # Gate: require the knee to be nontrivially above the diagonal.
-    # A perfectly straight line gives d_max == 0; a strong knee gives
-    # d_max of order 0.2 - 0.5.  ``S`` linearly scales the gate.
-    gate = max(S * 0.01, 1e-6)
-    if d[i] < gate:
-        return None
-    return i
-
-
-def _max_gradient_edge_index(rising):
-    """Index of the steepest outward HAND rise within ``rising``.
-
-    Centred-difference gradient (``np.gradient``) is computed on
-    ``rising`` (which spans the channel at index 0 to the dominant peak
-    at the last index).  The edge is taken as the location of the
-    largest positive gradient.
-
-    Returns
-    -------
-    int or None
-        Index within ``rising`` of the maximum positive derivative, or
-        ``None`` if the slice is too short, fully NaN, or has no
-        positive gradient (essentially flat profile).
-    """
-    rising = np.asarray(rising, dtype=np.float64)
-    n = rising.size
-    if n < 3 or not np.isfinite(rising).any():
-        return None
-
-    # ``np.gradient`` on a profile with NaNs propagates them; replace
-    # them with -inf so they cannot win the argmax but the array length
-    # is preserved.
-    if not np.isfinite(rising).all():
-        return None
-
-    dh = np.gradient(rising)
-    if not np.isfinite(dh).any():
-        return None
-
-    i = int(np.argmax(dh))
-    if dh[i] <= 0:
-        return None
-    return i
-
-
-def _edge_index_for_bank(h, smooth_win=0, prominence=0.0, S=1.0,
-                         edge_method='max_gradient'):
-    """Locate the valley-edge on one bank of a HAND profile.
-
-    The walk is outward from the channel: ``h[0]`` is at the channel,
-    ``h[-1]`` is at the outermost sample of the transect on this bank.
-
-    Strategy (noise-robust):
+    ``h`` is the outward HAND profile on this bank: ``h[0]`` is at the
+    channel, ``h[-1]`` is at the outermost sample.  Strategy:
 
     1. Optionally smooth ``h`` with a 1-D uniform filter (NaN-safe).
     2. Locate local maxima via :func:`scipy.signal.find_peaks` with a
-       minimum ``prominence``.
-    3. The *dominant* peak = the one with the greatest HAND value (not
-       the first).  Suppresses in-valley noise / terrace bumps.
-    4. Locate the valley edge on the rising portion
-       ``h[0:peak_idx+1]``:
+       minimum ``prominence``.  Fallback to ``argmax(h)`` when no
+       qualifying peak exists.
+    3. The *dominant* peak = the one with the greatest HAND value
+       (suppresses in-valley noise / terrace bumps).
+    4. Rim HAND on this bank = ``rim_fraction * H_peak``.
 
-       * ``edge_method='max_gradient'`` (default) - take the index of
-         the largest positive ``dHAND/ds`` (steepest wall).  Falls back
-         to the dominant peak if the gradient finder cannot find a
-         positive slope (essentially flat profile).
-       * ``edge_method='kneedle'`` - apply :func:`_knee_index_kneedle`
-         to find the corner of the concave-up rise; fall back to the
-         dominant peak if no knee qualifies.
+    The rim *location* is intentionally not returned: only the
+    threshold value enters the downstream pipeline, and its value is
+    far more stable along the channel than any single-point edge-index
+    picker (which jumps between terraces).
 
-    5. Fallback: if no peak found at all, use ``argmax(h)``.
+    Parameters
+    ----------
+    h : array_like
+        Outward HAND profile on this bank (channel at index 0).
+    smooth_win : int, optional
+        1-D uniform-filter window in samples.  0 disables smoothing.
+    prominence : float, optional
+        Minimum HAND prominence (m) for a sample to count as a local
+        maximum.
+    rim_fraction : float, optional
+        Fraction of the dominant peak HAND at which the rim is
+        declared.  Default 0.8 places the rim near the top of the
+        confining wall but below the ridge crest.
 
     Returns
     -------
-    edge_idx : int or None
-        Index along ``h`` of the detected edge, or ``None`` if no usable
-        edge could be found.
-    edge_hand : float
-        HAND value at the detected edge, or NaN.
+    rim_hand : float
+        HAND value at the valley rim on this bank, or NaN if no usable
+        peak could be found (e.g. the profile is all NaN or flat).
     """
     h = np.asarray(h, dtype=np.float64)
     n = h.size
     if n < 3:
-        return None, np.nan
+        return np.nan
 
     if smooth_win and smooth_win >= 2:
         filled = np.where(np.isfinite(h), h, 0.0)
@@ -175,92 +93,77 @@ def _edge_index_for_bank(h, smooth_win=0, prominence=0.0, S=1.0,
     # beyond is off-grid / masked and cannot contribute to a ridge.
     finite = np.isfinite(h_s)
     if not finite[0]:
-        return None, np.nan
+        return np.nan
     if finite.all():
         h_use = h_s
     else:
         first_nan = int(np.argmax(~finite))
         if first_nan < 3:
-            return None, np.nan
+            return np.nan
         h_use = h_s[:first_nan]
 
-    # Find all outward peaks (local maxima).
     prom = float(prominence) if prominence and prominence > 0 else None
     peaks, _props = find_peaks(h_use, prominence=prom)
 
     if peaks.size > 0:
-        dom_peak = int(peaks[int(np.argmax(h_use[peaks]))])
+        peak_hand = float(np.max(h_use[peaks]))
     else:
-        # No proper local max - use the absolute argmax as a fallback.
-        dom_peak = int(np.nanargmax(h_use))
-        if dom_peak == 0:
-            return None, np.nan
+        # No proper local max -> fallback to absolute argmax.
+        idx = int(np.nanargmax(h_use))
+        if idx == 0:
+            return np.nan
+        peak_hand = float(h_use[idx])
 
-    rising = h_use[:dom_peak + 1]
-    if rising.size < 3:
-        edge_idx = dom_peak
-    else:
-        method = (edge_method or 'max_gradient').lower()
-        if method == 'kneedle':
-            k = _knee_index_kneedle(rising, S=S)
-            edge_idx = dom_peak if k is None else int(k)
-        else:  # 'max_gradient' (default) or any unknown -> default
-            g = _max_gradient_edge_index(rising)
-            edge_idx = dom_peak if g is None else int(g)
+    if not np.isfinite(peak_hand) or peak_hand <= 0:
+        return np.nan
 
-    return edge_idx, float(h_use[edge_idx])
+    return float(rim_fraction) * peak_hand
 
 
-def _smooth_thresholds_along_channel(profile_xy, thresholds, radius):
-    """NaN-aware moving-mean smoothing of per-transect thresholds.
+def _rolling_median_along_channel(xy, values, radius):
+    """NaN-aware rolling-median smoothing of values positioned in 2-D.
 
-    For each profile centre, replace its threshold with the mean of the
-    finite thresholds whose centres lie within ``radius`` (Euclidean,
-    map units).  The query is done with a single KDTree.ball lookup so
-    smoothing follows the actual geometry of the channel - profiles on
-    different stream segments that happen to be close in space are also
-    grouped (this keeps the smoothing well-defined where two segments
-    converge).
+    For each point, replace its value with the median of the finite
+    values whose positions lie within ``radius`` (Euclidean, map
+    units).  A single KDTree.ball lookup handles the neighbourhood so
+    geometry is followed naturally even at stream junctions.
 
     Parameters
     ----------
-    profile_xy : np.ndarray of shape (N, 2)
-        Profile centres (x, y).
-    thresholds : np.ndarray of shape (N,)
-        Per-transect thresholds (m).  NaN entries are excluded from the
-        averaging but their slots still receive a smoothed value if any
-        finite neighbour exists in their ball.
+    xy : np.ndarray of shape (N, 2)
+        Point locations (x, y) in map coordinates.
+    values : np.ndarray of shape (N,)
+        Values to smooth.  NaN entries are excluded from the median
+        but their slots still receive a smoothed value if any finite
+        neighbour exists in their ball.
     radius : float
         Smoothing radius in map units.  ``radius <= 0`` returns the
-        thresholds unchanged.
+        values unchanged.
 
     Returns
     -------
     np.ndarray of shape (N,)
-        Smoothed thresholds.  Slots with no finite neighbours stay NaN.
+        Smoothed values.  Slots with no finite neighbours stay NaN.
     """
-    thresholds = np.asarray(thresholds, dtype=np.float64).copy()
-    profile_xy = np.asarray(profile_xy, dtype=np.float64)
-    if radius is None or radius <= 0 or thresholds.size == 0:
-        return thresholds
+    values = np.asarray(values, dtype=np.float64).copy()
+    xy = np.asarray(xy, dtype=np.float64)
+    if radius is None or radius <= 0 or values.size == 0:
+        return values
 
-    finite = np.isfinite(thresholds)
+    finite = np.isfinite(values)
     if not finite.any():
-        return thresholds
+        return values
 
-    # Build the KDTree only on finite-threshold profiles, but query for
-    # every profile so even (initially) NaN slots get a smoothed value
-    # if neighbours exist within the radius.
-    xy_v = profile_xy[finite]
-    thr_v = thresholds[finite]
+    xy_v = xy[finite]
+    val_v = values[finite]
     tree = cKDTree(xy_v)
-    neighbour_lists = tree.query_ball_point(profile_xy, r=float(radius))
+    neighbour_lists = tree.query_ball_point(xy, r=float(radius))
 
-    smoothed = np.full_like(thresholds, np.nan)
+    smoothed = np.full_like(values, np.nan)
     for i, nbrs in enumerate(neighbour_lists):
         if not nbrs:
             continue
-        smoothed[i] = float(np.mean(thr_v[nbrs]))
+        smoothed[i] = float(np.median(val_v[nbrs]))
     return smoothed
 
 
@@ -270,9 +173,8 @@ def _smooth_thresholds_along_channel(profile_xy, thresholds, radius):
 
 def per_transect_edge_thresholds(swath_profiles_dz, peak_smoothing_radius=0.0,
                                  peak_min_prominence=0.0,
-                                 kneedle_sensitivity=1.0, cellsize=None,
-                                 edge_method='max_gradient'):
-    """Per-transect bank-edge HAND values and valley-depth threshold.
+                                 rim_fraction=0.8, cellsize=None):
+    """Per-transect bank-rim HAND values and valley-depth threshold.
 
     Parameters
     ----------
@@ -280,38 +182,32 @@ def per_transect_edge_thresholds(swath_profiles_dz, peak_smoothing_radius=0.0,
         Cross-stream swath profiles whose ``.Z`` is the HAND grid (DZ).
     peak_smoothing_radius : float, optional
         1-D uniform-filter window (m) applied to each per-side HAND
-        profile before edge detection. Default 0 (no smoothing).
+        profile before rim detection.  Default 0 (no smoothing).
     peak_min_prominence : float, optional
         Minimum HAND rise (m) required for a sample to count as a local
-        maximum.  Filters out in-valley micro-bumps / terraces. Default 0.
-    kneedle_sensitivity : float, optional
-        Kneedle sensitivity gate on the normalised distance-from-diagonal.
-        Used only when ``edge_method='kneedle'``.  Default 1.0.
+        maximum.  Filters out in-valley micro-bumps / terraces.  Default 0.
+    rim_fraction : float, optional
+        Fraction of the dominant peak HAND at which the valley rim is
+        declared on each bank.  Default 0.8.
     cellsize : float, optional
-        Grid cell size in map units.  Required for converting
+        Grid cell size (map units).  Used to convert
         ``peak_smoothing_radius`` to an integer sample window.  If None,
         inferred from ``disty`` spacing.
-    edge_method : {'max_gradient', 'kneedle'}, optional
-        Per-bank edge detector.  ``'max_gradient'`` (default) sets the
-        edge at the steepest outward HAND rise (``argmax dHAND/ds``)
-        within the rising portion to the dominant peak.  ``'kneedle'``
-        uses the simplified Kneedle knee finder.  Both fall back to the
-        dominant peak itself on degenerate profiles.
 
     Returns
     -------
     edges : np.ndarray of shape (N_total, 6)
         One row per cross-profile across all swaths, in the same order
-        that ``stream2swath`` produces the profiles.  Columns:
+        :func:`stream2swath` produces the profiles.  Columns:
 
         * 0 - profile centre x,
         * 1 - profile centre y,
-        * 2 - HAND at left-bank edge (NaN if not found),
-        * 3 - HAND at right-bank edge (NaN if not found),
+        * 2 - rim HAND on left bank (NaN if not found),
+        * 3 - rim HAND on right bank (NaN if not found),
         * 4 - per-transect depth threshold = min(col 2, col 3); NaN if
-          neither bank yielded an edge,
-        * 5 - saturated flag (1 if at least one bank failed to find
-          an edge).
+          neither bank yielded a rim,
+        * 5 - saturated flag (1 if at least one bank failed to find a
+          rim).
     """
     rows_out = []
     for swath in swath_profiles_dz:
@@ -337,23 +233,22 @@ def per_transect_edge_thresholds(swath_profiles_dz, peak_smoothing_radius=0.0,
 
         for pp in range(n_profiles):
             profile = Z[:, pp]
-            # Positive bank (disty >= 0): channel at index 0 in slice.
             pos_h = profile[c_idx:]
-            # Negative bank (disty <= 0): reverse so channel is at index 0
-            # and we walk outward.
             neg_h = profile[c_idx::-1]
 
-            _, hand_pos = _edge_index_for_bank(
+            rim_pos = _rim_hand_for_bank(
                 pos_h, smooth_win=smooth_win,
-                prominence=peak_min_prominence, S=kneedle_sensitivity,
-                edge_method=edge_method)
-            _, hand_neg = _edge_index_for_bank(
+                prominence=peak_min_prominence,
+                rim_fraction=rim_fraction,
+            )
+            rim_neg = _rim_hand_for_bank(
                 neg_h, smooth_win=smooth_win,
-                prominence=peak_min_prominence, S=kneedle_sensitivity,
-                edge_method=edge_method)
+                prominence=peak_min_prominence,
+                rim_fraction=rim_fraction,
+            )
 
-            hand_left = hand_neg   # negative-disty bank
-            hand_right = hand_pos  # positive-disty bank
+            hand_left = rim_neg   # negative-disty bank
+            hand_right = rim_pos  # positive-disty bank
 
             left_ok = np.isfinite(hand_left)
             right_ok = np.isfinite(hand_right)
@@ -382,32 +277,34 @@ def per_transect_edge_thresholds(swath_profiles_dz, peak_smoothing_radius=0.0,
     return np.asarray(rows_out, dtype=np.float64)
 
 
-def _disk_structure(radius_pixels):
-    """Return a circular boolean structuring element of the given radius."""
-    r = max(int(round(radius_pixels)), 1)
-    y, x = np.ogrid[-r:r + 1, -r:r + 1]
-    return (x * x + y * y) <= r * r
-
-
 def build_dv_from_thresholds(dem, stream, DZ, profile_xy, thresholds,
                              nodata_mask=None, max_dist=None,
-                             fill_holes=False, closing_radius=0.0):
-    """Build a valley-classification grid from spatially-varying HAND thresholds.
+                             smooth_radius=0.0):
+    """Build a valley-classification grid from a variable along-channel threshold.
 
-    Each DEM pixel is assigned the threshold of the *nearest* cross-profile
-    centre (via a KDTree).  Pixels whose HAND is below that threshold are
-    marked valley (1).  Stream pixels are marked channel (2).  Masked
-    pixels are forced to hillslope (0).  Optionally, pixels farther from
-    any profile than ``max_dist`` are also forced to hillslope, preventing
-    the valley fill from leaking into regions that the transect sampling
-    never covered.
+    Per-transect thresholds are first mapped onto the *dense* stream-node
+    array (each stream node gets the threshold of its nearest profile
+    centre), then smoothed along the channel with a rolling median.  The
+    smoothed per-node thresholds define the variable elevthreshold along
+    the channel.  For every DEM pixel, the threshold is the one assigned
+    to its nearest stream node (KDTree ``k=1`` query); because stream
+    nodes are at cellsize spacing, the Voronoi tiles in the threshold
+    raster collapse to a single pixel, so the DV boundary behaves like
+    a smooth iso-HAND contour - the same visual character as the
+    ``valleyclass_elev`` flood-fill, just with a threshold that varies
+    along the channel.
+
+    The classification then mirrors :func:`valleyclass_elev` exactly:
+    ``is_valley = HAND < threshold``, stream pixels are forced True,
+    and only connected components touching a stream pixel are kept.
 
     Parameters
     ----------
     dem : topotoolbox.GridObject
         Template grid (shape, transform, cellsize).
     stream : topotoolbox.StreamObject
-        Stream network whose pixels will be stamped as channel (2).
+        Stream network whose pixels will be stamped as channel (2) and
+        whose nodes host the along-channel variable threshold.
     DZ : topotoolbox.GridObject
         HAND grid (height above nearest drainage).
     profile_xy : np.ndarray of shape (N, 2)
@@ -418,17 +315,12 @@ def build_dv_from_thresholds(dem, stream, DZ, profile_xy, thresholds,
     nodata_mask : np.ndarray of bool, optional
         Pixels to force to hillslope after classification.
     max_dist : float, optional
-        Maximum planimetric distance (m) from a profile for a pixel to be
-        eligible for valley classification.  Pixels beyond this are forced
-        to hillslope.  Default None (no distance limit).
-    fill_holes : bool, optional
-        If True, run :func:`scipy.ndimage.binary_fill_holes` on the
-        channel-connected valley mask to close enclosed pockets caused
-        by HAND noise inside the valley.  Default False.
-    closing_radius : float, optional
-        Radius (m) of the disk-shaped structuring element used by
-        :func:`scipy.ndimage.binary_closing` to smooth jagged
-        boundaries.  ``0`` (default) disables closing.
+        Maximum planimetric distance (m) from a stream node for a pixel
+        to be eligible for valley classification.  Pixels beyond this
+        are forced to hillslope.  Default None (no distance limit).
+    smooth_radius : float, optional
+        Rolling-median window radius (m), applied along the channel to
+        the per-stream-node threshold array.  ``0`` disables smoothing.
 
     Returns
     -------
@@ -440,29 +332,54 @@ def build_dv_from_thresholds(dem, stream, DZ, profile_xy, thresholds,
     dv_arr = np.zeros((nrows, ncols), dtype=np.float32)
 
     srows, scols = stream.node_indices
+    t = dem.transform
+    node_x = t[0] * scols + t[2]
+    node_y = t[4] * srows + t[5]
+    stream_xy = np.column_stack([node_x, node_y])
 
     valid = np.isfinite(thresholds)
-    if valid.any():
+    if valid.any() and stream_xy.shape[0] > 0:
         xy_v = np.asarray(profile_xy)[valid]
         thr_v = np.asarray(thresholds)[valid]
 
-        tree = cKDTree(xy_v)
+        # Step 1: assign each stream node the threshold of its nearest
+        # profile centre.  This lifts the sparse per-profile thresholds
+        # onto the dense stream-node array (cellsize spacing).
+        prof_tree = cKDTree(xy_v)
+        _, prof_idx = prof_tree.query(stream_xy, k=1)
+        node_thr = thr_v[prof_idx].astype(np.float64, copy=True)
 
-        t = dem.transform
+        # Step 2: smooth the per-node threshold along the channel with
+        # a NaN-aware rolling median.  The Euclidean KDTree-ball
+        # neighbourhood follows the actual stream geometry (handles
+        # junctions naturally).
+        if smooth_radius and smooth_radius > 0:
+            node_thr = _rolling_median_along_channel(
+                stream_xy, node_thr, radius=smooth_radius,
+            )
+
+        # Step 3: for every DEM pixel, look up the threshold of its
+        # nearest stream node.  Because stream nodes are dense, the
+        # Voronoi tiles are at pixel scale (no visible scan lines).
+        node_tree = cKDTree(stream_xy)
         col_arr = np.arange(ncols)
         row_arr = np.arange(nrows)
-        # Pixel centres in map coordinates.
         pix_x = t[0] * col_arr + t[2]
         pix_y = t[4] * row_arr + t[5]
         XX, YY = np.meshgrid(pix_x, pix_y)
         pts = np.column_stack([XX.ravel(), YY.ravel()])
 
-        dists, idx = tree.query(pts, k=1)
-        thr_grid = thr_v[idx].reshape(nrows, ncols)
+        dists, idx = node_tree.query(pts, k=1)
+        thr_grid = node_thr[idx].reshape(nrows, ncols)
         dist_grid = dists.reshape(nrows, ncols)
 
+        # Classify: HAND below the local threshold -> valley candidate.
         with np.errstate(invalid='ignore'):
-            is_valley = np.isfinite(dz_arr) & (dz_arr < thr_grid)
+            is_valley = (
+                np.isfinite(dz_arr)
+                & np.isfinite(thr_grid)
+                & (dz_arr < thr_grid)
+            )
 
         if max_dist is not None and max_dist > 0:
             is_valley &= (dist_grid <= float(max_dist))
@@ -470,12 +387,10 @@ def build_dv_from_thresholds(dem, stream, DZ, profile_xy, thresholds,
         if nodata_mask is not None:
             is_valley &= ~nodata_mask
 
-        # Restrict the valley to components reachable from the channel by
-        # walking through below-threshold HAND cells (same logic as the
-        # connected-component step in valleyclass_elev). This discards
-        # off-channel low-HAND pockets that the per-profile nearest lookup
-        # can otherwise produce near the DEM edges or in disconnected
-        # drainages.
+        # Keep only components reachable from the channel by walking
+        # through below-threshold HAND cells (identical logic to
+        # valleyclass_elev).  This discards off-channel low-HAND
+        # pockets.
         is_valley[srows, scols] = True
         labels, n_labels = label(is_valley,
                                  structure=np.ones((3, 3), dtype=bool))
@@ -486,26 +401,11 @@ def build_dv_from_thresholds(dem, stream, DZ, profile_xy, thresholds,
             if stream_label_ids.size > 0:
                 keep_mask = np.isin(labels, stream_label_ids)
 
-        # Optional morphological cleanup (Kneedle mode in dem2widths).
-        if fill_holes and keep_mask.any():
-            keep_mask = binary_fill_holes(keep_mask)
-
-        if closing_radius and closing_radius > 0 and keep_mask.any():
-            cs = float(getattr(dem, 'cellsize', 1.0)) or 1.0
-            radius_pix = max(closing_radius / cs, 1.0)
-            keep_mask = binary_closing(
-                keep_mask,
-                structure=_disk_structure(radius_pix),
-            )
-
-        # Re-apply nodata exclusion: closing/fill must not leak into
-        # masked regions.
         if nodata_mask is not None:
             keep_mask &= ~nodata_mask
 
         dv_arr[keep_mask] = 1.0
 
-    # Stream override (always category 2)
     dv_arr[srows, scols] = 2.0
 
     if nodata_mask is not None:

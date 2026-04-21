@@ -414,7 +414,7 @@ def plot_longitudinal_trunk_ksn_valley_width_twin(
                 z_ch_sorted[valid_top_ma] * scale_z,
                 valley_top_ma_sorted[valid_top_ma] * scale_z,
                 color='red',
-                alpha=0.3,
+                alpha=0.12,
                 linewidth=0,
                 zorder=2,
                 label='Valley depth envelope',
@@ -474,7 +474,7 @@ def plot_longitudinal_trunk_ksn_valley_width_twin(
             0.0,
             vw_ma_sorted[valid_vw_ma] * scale_w,
             color='steelblue',
-            alpha=0.25,
+            alpha=0.1,
             zorder=2,
         )
         ax_w.plot(
@@ -488,10 +488,15 @@ def plot_longitudinal_trunk_ksn_valley_width_twin(
         )
     ax_w.set_ylabel(wlabel, fontsize=12, color='steelblue')
     ax_w.tick_params(axis='y', labelcolor='steelblue')
-    ax_w.legend(loc='upper right', fontsize=10)
+    ax_w.legend(loc='upper left', fontsize=10)
     if valleywidth_ylim is not None:
         ymin, ymax = valleywidth_ylim
         ax_w.set_ylim(ymin * scale_w, ymax * scale_w)
+
+    # Ensure the ksn-colored channel scatter (on ax_main) renders on top of the
+    # twin-axis artists (width dots/MA/shading on ax_w).
+    ax_main.set_zorder(ax_w.get_zorder() + 1)
+    ax_main.patch.set_visible(False)
 
     plt.tight_layout()
     if savefig:

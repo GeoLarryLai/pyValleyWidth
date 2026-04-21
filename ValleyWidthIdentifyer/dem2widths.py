@@ -14,7 +14,6 @@ from .swath_width import swath_width
 from .peak_valley_width import (
     per_transect_edge_thresholds,
     build_dv_from_thresholds,
-    _smooth_thresholds_along_channel,
 )
 
 
@@ -26,8 +25,7 @@ def dem2widths(dem, streamarea, elevthreshold=None, swath_dx=None, minradius=Non
               max_valley_width=False,
               peak_smoothing_radius=0.0,
               peak_min_prominence=0.0,
-              kneedle_sensitivity=1.0,
-              edge_method='max_gradient',
+              rim_fraction=0.8,
               dv_smooth_radius=None):
     """Full pipeline from DEM to valley-width measurements.
 
@@ -90,56 +88,42 @@ def dem2widths(dem, streamarea, elevthreshold=None, swath_dx=None, minradius=Non
         Masked pixels are forced to hillslope in ``DV`` so empty edges no
         longer register as valley and no longer inflate swath widths.
     max_valley_width : bool, optional
-        If True, switch to the per-transect *edge-based* mode. For each
-        cross-profile, the HAND profile on each bank is scanned outward
-        from the channel; ``scipy.signal.find_peaks`` (with
-        ``peak_min_prominence``) identifies candidate ridges and the
-        dominant one (largest HAND) is selected to suppress in-valley
-        noise / terrace bumps; a simplified Kneedle algorithm then locates
-        the *knee* on the rising portion leading to that peak - the
-        break-in-slope from valley floor to hillslope = the valley edge.
-        The per-transect valley depth threshold is the minimum of the two
-        bank-edge HAND values (the lower rim controls). Thresholds vary
-        along the channel, are painted into ``DV`` via nearest-profile
-        lookup, and widths are then measured from that ``DV`` with the
-        same :func:`swath_width` method used in the base mode, so widths
-        and ``DV`` are always consistent. ``elevthreshold`` is ignored
-        in this mode. Default False.
+        If True, switch to the variable along-channel elevthreshold
+        mode.  For each cross-profile, the HAND profile on each bank is
+        scanned outward from the channel; ``scipy.signal.find_peaks``
+        (with ``peak_min_prominence``) identifies candidate ridges and
+        the *dominant* one (largest HAND) is selected.  The valley rim
+        HAND on that bank is declared at ``rim_fraction * H_peak``, and
+        the per-transect threshold is the minimum of the two bank rims
+        (the lower rim controls).  These per-transect thresholds are
+        then interpolated onto the dense stream-node array, smoothed
+        along the channel with a rolling median of radius
+        ``dv_smooth_radius``, and used to build ``DV`` via the same
+        flood-fill logic as :func:`valleyclass_elev` - just with a
+        threshold that varies along the channel instead of a single
+        scalar.  Widths are measured from that ``DV`` with the same
+        :func:`swath_width` method used in the base mode, so widths
+        and ``DV`` are always consistent.  ``elevthreshold`` is ignored
+        in this mode.  Default False.
     peak_smoothing_radius : float, optional
-        Smoothing window (m) applied to each per-side HAND profile before
-        edge detection in ``max_valley_width`` mode. Default 0 (no
-        smoothing).
+        Smoothing window (m) applied to each per-side HAND profile
+        before rim detection in ``max_valley_width`` mode.  Default 0
+        (no smoothing).
     peak_min_prominence : float, optional
         Minimum HAND prominence (m) for a sample to qualify as a ridge
-        candidate in ``max_valley_width`` mode. Filters out minor
-        in-valley bumps. Default 0.
-    kneedle_sensitivity : float, optional
-        Kneedle sensitivity ``S`` used only when
-        ``edge_method='kneedle'``: gate on the normalised distance-from-
-        diagonal that a knee must exceed to be reported. Higher values
-        require a more pronounced corner. Default 1.0.
-    edge_method : {'max_gradient', 'kneedle'}, optional
-        Per-bank edge detector used in ``max_valley_width=True`` mode.
-
-        * ``'max_gradient'`` (default) - the bank edge is at the
-          steepest outward HAND rise (``argmax dHAND/ds``) within the
-          rising portion to the dominant peak.  Matches the visually
-          sharp red->blue / white->blue transitions on a HAND map.  No
-          DV cleanup is applied in this mode.
-        * ``'kneedle'`` - the bank edge is the simplified-Kneedle knee
-          of the rising portion.  In this mode the DV polygon is also
-          cleaned: per-transect thresholds are smoothed along the
-          channel within ``dv_smooth_radius``, holes are filled, and a
-          small morphological closing is applied.
-
-        Ignored when ``max_valley_width=False``.
+        candidate in ``max_valley_width`` mode.  Filters out minor
+        in-valley bumps.  Default 0.
+    rim_fraction : float, optional
+        Fraction of the dominant peak HAND at which the valley rim is
+        declared on each bank in ``max_valley_width=True`` mode.
+        Default 0.8.  Smaller values push the rim closer to the valley
+        floor (tighter valley); larger values push it toward the ridge
+        crest (wider valley).  Ignored when ``max_valley_width=False``.
     dv_smooth_radius : float, optional
-        Smoothing radius (m) used only when
-        ``max_valley_width=True`` and ``edge_method='kneedle'``.
-        Controls (a) the along-channel moving-mean window applied to
-        the per-transect thresholds and (b) the radius of the disk
-        used by ``binary_closing`` on the final mask.  Defaults to
-        ``minradius``.
+        Rolling-median window radius (m) applied along the channel to
+        the per-stream-node threshold array in ``max_valley_width=True``
+        mode.  Defaults to ``minradius``.  Ignored when
+        ``max_valley_width=False``.
 
     Returns
     -------
@@ -294,53 +278,41 @@ def dem2widths(dem, streamarea, elevthreshold=None, swath_dx=None, minradius=Non
             dz_arr[nodata_mask] = np.nan
             DZ.z = dz_arr
 
-        print("Swath sampling on HAND (for edge detection)")
+        print("Swath sampling on HAND (for rim detection)")
         swath_profiles_hand = stream2swath(S, DZ, swath_dx, swath_width_param)
 
-        method = (edge_method or 'max_gradient').lower()
-        print(f"Per-transect edge detection on both banks (method={method!r})")
+        print(
+            f"Per-transect rim detection on both banks "
+            f"(rim_fraction={rim_fraction})"
+        )
         edges = per_transect_edge_thresholds(
             swath_profiles_hand,
             peak_smoothing_radius=peak_smoothing_radius,
             peak_min_prominence=peak_min_prominence,
-            kneedle_sensitivity=kneedle_sensitivity,
+            rim_fraction=rim_fraction,
             cellsize=dem.cellsize,
-            edge_method=method,
         )
         # edges columns: x, y, hand_left, hand_right, threshold, saturated
 
-        # DV cleanup is only applied in Kneedle mode (per design):
-        # max_gradient already produces sharp, geometry-faithful edges
-        # so the raw threshold field gets painted directly.
-        if method == 'kneedle':
-            smooth_r = (
-                float(dv_smooth_radius)
-                if dv_smooth_radius is not None
-                else float(minradius)
+        smooth_r = (
+            float(dv_smooth_radius)
+            if dv_smooth_radius is not None
+            else float(minradius)
+        )
+        if smooth_r and smooth_r > 0:
+            print(
+                f"Rolling-median smoothing of along-channel threshold "
+                f"(radius={smooth_r:.0f} m) applied at stream-node resolution"
             )
-            if smooth_r and smooth_r > 0 and edges.shape[0] > 0:
-                print(
-                    f"Smoothing per-transect thresholds along channel "
-                    f"(radius={smooth_r:.0f} m)"
-                )
-                edges[:, 4] = _smooth_thresholds_along_channel(
-                    edges[:, :2], edges[:, 4], radius=smooth_r,
-                )
-            dv_fill_holes = True
-            dv_closing_radius = smooth_r if smooth_r and smooth_r > 0 else 0.0
-        else:
-            dv_fill_holes = False
-            dv_closing_radius = 0.0
 
-        print("Building DV from spatially-varying threshold")
+        print("Building DV from variable along-channel elevthreshold")
         DV = build_dv_from_thresholds(
             dem, S, DZ,
             profile_xy=edges[:, :2],
             thresholds=edges[:, 4],
             nodata_mask=nodata_mask,
             max_dist=swath_width_param / 2.0,
-            fill_holes=dv_fill_holes,
-            closing_radius=dv_closing_radius,
+            smooth_radius=smooth_r,
         )
 
         if plot:
