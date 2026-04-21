@@ -7,6 +7,10 @@ using the Python topotoolbox package for core DEM analysis.
 from .dem2widths import dem2widths
 from .valleyclass_elev import valleyclass_elev
 from .swath_width import swath_width
+from .peak_valley_width import (
+    per_transect_edge_thresholds,
+    build_dv_from_thresholds,
+)
 from .stream_utils import removeshortstreams, stream2swath, SwathProfile
 from .ksn_analysis import (
     slopearea,
@@ -37,6 +41,8 @@ __all__ = [
     'dem2widths',
     'valleyclass_elev',
     'swath_width',
+    'per_transect_edge_thresholds',
+    'build_dv_from_thresholds',
     'removeshortstreams',
     'stream2swath',
     'SwathProfile',

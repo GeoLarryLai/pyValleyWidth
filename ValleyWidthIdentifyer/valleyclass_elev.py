@@ -7,6 +7,8 @@ ElevationThresholdValleyWidth toolbox.
 import numpy as np
 import copy
 
+from scipy.ndimage import label
+
 
 def valleyclass_elev(dem, stream, flow, elevthreshold, plot=False,
                      nodata_mask=None):
@@ -53,11 +55,34 @@ def valleyclass_elev(dem, stream, flow, elevthreshold, plot=False,
 
     # Mark stream pixels
     rows, cols = stream.node_indices
-    dv_arr[rows, cols] = 2.0
 
-    # Mark valley pixels where HAND < threshold (and not already stream)
-    valley_mask = (dz_arr < elevthreshold) & (dv_arr < 2.0)
-    dv_arr[valley_mask] = 1.0
+    # Candidate valley pixels: HAND below threshold, finite, and not masked.
+    # ``dz_arr < threshold`` with NaN returns False, so NoData is already
+    # excluded, but keep the explicit isfinite guard for clarity.
+    valley_candidate = np.isfinite(dz_arr) & (dz_arr < elevthreshold)
+    # Stream pixels must belong to the valley so the flood-fill includes them.
+    valley_candidate[rows, cols] = True
+    if nodata_mask is not None:
+        valley_candidate[nodata_mask] = False
+
+    # Connected-component flood from the stream: only components that contain
+    # at least one stream pixel are kept. This restricts the valley to the
+    # region reachable from the channel by walking through below-threshold HAND
+    # cells, clipping at the first wall (HAND >= threshold) on every bearing -
+    # matching the "nearest interception with topography from both banks"
+    # requirement. Off-channel low-HAND pockets (e.g. flat edge artefacts,
+    # disconnected basins) are discarded.
+    labels, n_labels = label(valley_candidate,
+                             structure=np.ones((3, 3), dtype=bool))
+    if n_labels > 0:
+        stream_label_ids = np.unique(labels[rows, cols])
+        stream_label_ids = stream_label_ids[stream_label_ids > 0]
+        if stream_label_ids.size > 0:
+            keep_mask = np.isin(labels, stream_label_ids)
+            dv_arr[keep_mask] = 1.0
+
+    # Stream override (always category 2)
+    dv_arr[rows, cols] = 2.0
 
     # Force NoData pixels to hillslope so they don't register as valley
     if nodata_mask is not None:

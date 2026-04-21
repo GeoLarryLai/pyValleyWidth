@@ -200,7 +200,7 @@ def plot_longitudinal_trunk_ksn_valley_width_twin(
     allwidths,
     theta=-0.45,
     ksn_window=200,
-    vw_window=100,
+    valleywidth_window=100,
     max_match_dist=150.0,
     vw_outline_sigma_pts=4.0,
     ksn_vmin=0,
@@ -209,43 +209,120 @@ def plot_longitudinal_trunk_ksn_valley_width_twin(
     valleywidth_ylim=None,
     figsize=(16, 6),
     savefig=None,
+    allvalleydepth=None,
+    valleydepth_window=None,
+    ma_window_m=500.0,
 ):
-    """Long profile (distance–Z): gray scatter of all *s2* nodes, trunk colored by k_sn, twin = width.
+    """Long profile (distance-Z): gray s2 scatter, trunk colored by k_sn, twin = valley width.
 
-    Gray background uses the same outlet-distance vs elevation point cloud as the Mataian
-    all-stream long profile (not ``plotdz`` polylines). Valley width uses the **same**
-    smoothed-on-*s2* field as the map pipeline, sampled onto trunk NAL nodes via
-    ``trunk_valley_width_from_s2_field``, then drawn in ``st.xy`` segment order with a light
-    Gaussian on the outline.
+    Three-layer valley-width / valley-top overlay:
+
+    1. **Stream-network smoothed** values at each trunk NAL vertex (width via
+       ``valley_width_smoothed_on_stream`` + ``trunk_valley_width_from_s2_field`` with
+       window ``valleywidth_window``; depth via the same pipeline with
+       ``valleydepth_window``, falling back to ``valleywidth_window``) are plotted as
+       faint dots (``alpha=0.2``).
+    2. A **distance-based moving-average curve** over those smoothed dots, with window
+       ``ma_window_m`` meters, shared between width and valley-top.
+    3. Shading (``alpha=0.25`` for width, ``alpha=0.3`` for valley top) is drawn under /
+       between the MA curve(s) only.
+
+    Axes are in meters by default. When the max magnitude of distance or width exceeds
+    10 000, values are divided by 1000 and the axis label becomes ``(x1000 m)``.
+
+    Note: ``vw_outline_sigma_pts`` is retained for API stability but is no longer used
+    (the moving average replaces the old outline smoothing).
     """
     st_z = np.asarray(st.ezgetnal(dem), dtype=float)
-    trunk_dist_km = np.asarray(st.distance(), dtype=np.float64) / 1000.0
+    trunk_dist_m = np.asarray(st.distance(), dtype=np.float64)
 
     ksn_st = calculate_ksn(st, dem_imposed, acc, theta)
     ksn_st_smoothed = smooth_stream_values(st, ksn_st, window_size=ksn_window)
 
-    s2_vw_bundle = valley_width_smoothed_on_stream(
-        allwidths, s2, max_match_dist=max_match_dist, window_size=vw_window
+    s2_coords_flat, s2_vw_smooth_flat, dists_aw, _ = valley_width_smoothed_on_stream(
+        allwidths, s2, max_match_dist=max_match_dist, window_size=valleywidth_window
     )
-    s2_coords_flat, s2_vw_smooth_flat, dists_aw, _ = s2_vw_bundle
     vw_trunk_smooth_nal = trunk_valley_width_from_s2_field(
         allwidths,
         s2,
         st,
         max_match_dist=max_match_dist,
-        window_size=vw_window,
+        window_size=valleywidth_window,
         s2_field=(s2_coords_flat, s2_vw_smooth_flat),
     )
 
+    # Optional valley-depth field projected onto the trunk via the same s2 pipeline.
+    depth_trunk_smooth_nal = None
+    if allvalleydepth is not None:
+        depth_arr = np.asarray(allvalleydepth, dtype=float).reshape(-1)
+        depth_xyz = np.column_stack(
+            [allwidths[:, 0], allwidths[:, 1], depth_arr]
+        )
+        d_window = (
+            int(valleydepth_window)
+            if valleydepth_window is not None
+            else int(valleywidth_window)
+        )
+        s2_d_coords, s2_d_smooth, _, _ = valley_width_smoothed_on_stream(
+            depth_xyz, s2, max_match_dist=max_match_dist, window_size=d_window
+        )
+        depth_trunk_smooth_nal = trunk_valley_width_from_s2_field(
+            depth_xyz,
+            s2,
+            st,
+            max_match_dist=max_match_dist,
+            window_size=d_window,
+            s2_field=(s2_d_coords, s2_d_smooth),
+        )
+
     min_len = min(
-        len(trunk_dist_km), len(st_z), len(ksn_st_smoothed), len(vw_trunk_smooth_nal)
+        len(trunk_dist_m), len(st_z), len(ksn_st_smoothed), len(vw_trunk_smooth_nal)
     )
-    trunk_dist_km = np.asarray(trunk_dist_km[:min_len], dtype=np.float64)
+    if depth_trunk_smooth_nal is not None:
+        min_len = min(min_len, len(depth_trunk_smooth_nal))
+    trunk_dist_m = np.asarray(trunk_dist_m[:min_len], dtype=np.float64)
     st_z = st_z[:min_len]
     ksn_st_smoothed = ksn_st_smoothed[:min_len]
     vw_trunk_smooth_nal = np.asarray(vw_trunk_smooth_nal[:min_len], dtype=np.float64)
+    if depth_trunk_smooth_nal is not None:
+        depth_trunk_smooth_nal = np.asarray(
+            depth_trunk_smooth_nal[:min_len], dtype=np.float64
+        )
 
-    # ksn_clim (vmin, vmax) overrides ksn_vmin/ksn_vmax when provided.
+    # Distance-based NaN-aware moving average over sorted (d, v).
+    def _moving_avg_distance(d_sorted_m, v_sorted, window_m):
+        v = np.asarray(v_sorted, dtype=float)
+        if window_m is None or window_m <= 0 or v.size == 0:
+            return v.copy()
+        half = float(window_m) / 2.0
+        lo = np.searchsorted(d_sorted_m, d_sorted_m - half, side='left')
+        hi = np.searchsorted(d_sorted_m, d_sorted_m + half, side='right')
+        flag = np.isfinite(v).astype(float)
+        filled = np.where(np.isfinite(v), v, 0.0)
+        csum = np.concatenate([[0.0], np.cumsum(filled)])
+        cflag = np.concatenate([[0.0], np.cumsum(flag)])
+        num = csum[hi] - csum[lo]
+        den = cflag[hi] - cflag[lo]
+        out = np.full_like(v, np.nan)
+        nz = den > 0
+        out[nz] = num[nz] / den[nz]
+        return out
+
+    order = np.argsort(trunk_dist_m)
+    xd_sorted_m = trunk_dist_m[order]
+    z_ch_sorted = st_z[order]
+    vw_smooth_sorted = vw_trunk_smooth_nal[order]
+    vw_ma_sorted = _moving_avg_distance(xd_sorted_m, vw_smooth_sorted, ma_window_m)
+
+    valley_top_sorted = None
+    valley_top_ma_sorted = None
+    if depth_trunk_smooth_nal is not None:
+        depth_smooth_sorted = depth_trunk_smooth_nal[order]
+        valley_top_sorted = z_ch_sorted + depth_smooth_sorted
+        valley_top_ma_sorted = _moving_avg_distance(
+            xd_sorted_m, valley_top_sorted, ma_window_m
+        )
+
     if ksn_clim is not None:
         _ksn_vmin, _ksn_vmax = ksn_clim
     else:
@@ -257,39 +334,43 @@ def plot_longitudinal_trunk_ksn_valley_width_twin(
         _ksn_vmin = 0
 
     mask_close = dists_aw < max_match_dist
-    print(f'Valley width points matched to s2 network: {mask_close.sum()} / {len(dists_aw)}')
-    print('Trunk overlay: s2 field; width line uses st.xy segment order (no global distance sort)')
-
-    seg_d_w = st.xy(
-        data=(
-            np.asarray(trunk_dist_km, dtype=np.float64),
-            np.asarray(vw_trunk_smooth_nal, dtype=np.float64),
-        )
+    print(
+        f'Valley width points matched to s2 network: {mask_close.sum()} / {len(dists_aw)}'
     )
 
     theta_lbl = f'{abs(theta):.2f}'
 
+    # Auto-scale axis units: (m) by default, switch to (x1000 m) when max magnitude > 1e4.
+    def _axis_scale_label(values, base_label):
+        arr = np.asarray(values, dtype=float)
+        finite = np.isfinite(arr)
+        vmax = float(np.max(np.abs(arr[finite]))) if finite.any() else 0.0
+        if vmax > 10000.0:
+            return 1.0 / 1000.0, f'{base_label} (x1000 m)'
+        return 1.0, f'{base_label} (m)'
+
+    scale_x, xlabel = _axis_scale_label(trunk_dist_m, 'Distance')
+    scale_z, zlabel = _axis_scale_label(st_z, 'Elevation')
+    scale_w, wlabel = _axis_scale_label(vw_trunk_smooth_nal, 'Valley Width')
+
     fig, ax_main = plt.subplots(figsize=figsize)
 
     # Per-node upstream distance on the s2 network (metres) for the gray background.
+    all_dist_m = np.asarray(s2.distance(), dtype=np.float64)
     s2_z = s2.ezgetnal(dem)
-    all_dist_km = np.asarray(s2.distance(), dtype=np.float64) / 1000.0
-    all_z = np.asarray(s2_z, dtype=np.float64)
+    all_z = np.asarray(s2_z, dtype=np.float64)  # noqa: F841 -- left for clarity
 
-    # Plot all branches as faint gray points (excluding trunk)
     st_trunk_nodes = set(st.nodes) if hasattr(st, 'nodes') else set()
     if not st_trunk_nodes:
         st_trunk_nodes = set(getattr(s2.trunk(), 'nodes', []))
-    s2_z = s2.ezgetnal(dem)
-    s2_dist = all_dist_km
-    groups = s2.xy(data=(s2_dist, s2_z))
+    groups = s2.xy(data=(all_dist_m, np.asarray(s2_z, dtype=np.float64)))
     background_dist = []
     background_z = []
     for seg in groups:
         if not seg:
             continue
         is_trunk_seg = False
-        if hasattr(s2, "nodes") and hasattr(st, "nodes"):
+        if hasattr(s2, 'nodes') and hasattr(st, 'nodes'):
             seg_node_indices = [s2.nodes[i] for i in range(len(s2.nodes)) if i < len(seg)]
             if set(seg_node_indices).intersection(st_trunk_nodes):
                 is_trunk_seg = True
@@ -301,8 +382,8 @@ def plot_longitudinal_trunk_ksn_valley_width_twin(
     background_z = np.asarray(background_z)
 
     ax_main.scatter(
-        background_dist,
-        background_z,
+        background_dist * scale_x,
+        background_z * scale_z,
         c='gray',
         s=1,
         alpha=0.3,
@@ -311,11 +392,46 @@ def plot_longitudinal_trunk_ksn_valley_width_twin(
         zorder=1,
     )
 
-    # --- END REWRITE gray branch plotting ---
+    # Valley-top envelope: smoothed-on-s2 dots + distance-based MA curve + shading.
+    if valley_top_ma_sorted is not None:
+        valid_top_dots = np.isfinite(valley_top_sorted)
+        if valid_top_dots.any():
+            ax_main.scatter(
+                xd_sorted_m[valid_top_dots] * scale_x,
+                valley_top_sorted[valid_top_dots] * scale_z,
+                c='red',
+                s=6,
+                alpha=0.2,
+                linewidths=0,
+                edgecolors='none',
+                zorder=3,
+                label='Valley top (smoothed on s2)',
+            )
+        valid_top_ma = np.isfinite(z_ch_sorted) & np.isfinite(valley_top_ma_sorted)
+        if valid_top_ma.any():
+            ax_main.fill_between(
+                xd_sorted_m[valid_top_ma] * scale_x,
+                z_ch_sorted[valid_top_ma] * scale_z,
+                valley_top_ma_sorted[valid_top_ma] * scale_z,
+                color='red',
+                alpha=0.3,
+                linewidth=0,
+                zorder=2,
+                label='Valley depth envelope',
+            )
+            ax_main.plot(
+                xd_sorted_m[valid_top_ma] * scale_x,
+                valley_top_ma_sorted[valid_top_ma] * scale_z,
+                color='red',
+                alpha=0.6,
+                linewidth=1.2,
+                zorder=4,
+                label=f'Valley top (MA, {ma_window_m:g} m)',
+            )
 
     sc1 = ax_main.scatter(
-        trunk_dist_km,
-        st_z,
+        trunk_dist_m * scale_x,
+        st_z * scale_z,
         c=ksn_st_smoothed,
         cmap='viridis',
         s=8,
@@ -329,39 +445,53 @@ def plot_longitudinal_trunk_ksn_valley_width_twin(
     cbar1 = plt.colorbar(sc1, ax=ax_main, pad=0.08)
     cbar1.set_label(rf'$k_{{sn}}$ ($\theta$ = {theta_lbl})', fontsize=11)
 
-    ax_main.set_xlabel('Distance (km)', fontsize=12)
-    ax_main.set_ylabel('Elevation (m)', fontsize=12)
+    ax_main.set_xlabel(xlabel, fontsize=12)
+    ax_main.set_ylabel(zlabel, fontsize=12)
     ax_main.set_title(
         'Trunk longitudinal profile colored by $k_{sn}$ with valley width', fontsize=13
     )
     ax_main.grid(True, alpha=0.3)
 
+    # Twin axis: valley width (smoothed-on-s2 dots + MA curve + shading).
     ax_w = ax_main.twinx()
-    first_leg = True
-    for seg in seg_d_w:
-        if len(seg) < 1:
-            continue
-        arr = np.asarray(seg, dtype=np.float64)
-        o = np.argsort(arr[:, 0])
-        xd = arr[o, 0]
-        yw = arr[o, 1]
-        if yw.size >= 5:
-            yw = gaussian_filter1d(yw, sigma=vw_outline_sigma_pts, mode='nearest')
-        elif yw.size >= 3:
-            yw = gaussian_filter1d(
-                yw, sigma=min(vw_outline_sigma_pts, yw.size / 3.0), mode='nearest'
-            )
-        pkw = dict(color='steelblue', linewidth=1.2, alpha=0.8, zorder=3)
-        if first_leg:
-            pkw['label'] = 'Valley width (s2 field, trunk fill)'
-            first_leg = False
-        ax_w.fill_between(xd, 0, yw, color='steelblue', alpha=0.25, zorder=2)
-        ax_w.plot(xd, yw, **pkw)
-    ax_w.set_ylabel('Valley Width (m)', fontsize=12, color='steelblue')
+    valid_vw_dots = np.isfinite(vw_smooth_sorted)
+    if valid_vw_dots.any():
+        ax_w.scatter(
+            xd_sorted_m[valid_vw_dots] * scale_x,
+            vw_smooth_sorted[valid_vw_dots] * scale_w,
+            c='steelblue',
+            s=6,
+            alpha=0.2,
+            linewidths=0,
+            edgecolors='none',
+            zorder=2,
+            label='Valley width (smoothed on s2)',
+        )
+    valid_vw_ma = np.isfinite(vw_ma_sorted)
+    if valid_vw_ma.any():
+        ax_w.fill_between(
+            xd_sorted_m[valid_vw_ma] * scale_x,
+            0.0,
+            vw_ma_sorted[valid_vw_ma] * scale_w,
+            color='steelblue',
+            alpha=0.25,
+            zorder=2,
+        )
+        ax_w.plot(
+            xd_sorted_m[valid_vw_ma] * scale_x,
+            vw_ma_sorted[valid_vw_ma] * scale_w,
+            color='steelblue',
+            linewidth=1.4,
+            alpha=0.9,
+            zorder=3,
+            label=f'Valley width (MA, {ma_window_m:g} m)',
+        )
+    ax_w.set_ylabel(wlabel, fontsize=12, color='steelblue')
     ax_w.tick_params(axis='y', labelcolor='steelblue')
     ax_w.legend(loc='upper right', fontsize=10)
     if valleywidth_ylim is not None:
-        ax_w.set_ylim(valleywidth_ylim)
+        ymin, ymax = valleywidth_ylim
+        ax_w.set_ylim(ymin * scale_w, ymax * scale_w)
 
     plt.tight_layout()
     if savefig:
