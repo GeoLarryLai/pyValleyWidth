@@ -5,6 +5,7 @@ from collections import defaultdict
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import colors as mcolors
+from matplotlib.lines import Line2D
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from scipy.ndimage import gaussian_filter1d
 from scipy.spatial import cKDTree
@@ -221,11 +222,11 @@ def plot_longitudinal_trunk_ksn_valley_width_twin(
        ``valley_width_smoothed_on_stream`` + ``trunk_valley_width_from_s2_field`` with
        window ``valleywidth_window``; depth via the same pipeline with
        ``valleydepth_window``, falling back to ``valleywidth_window``) are plotted as
-       faint dots (``alpha=0.2``).
+       faint dots (``alpha=0.1``).
     2. A **distance-based moving-average curve** over those smoothed dots, with window
        ``ma_window_m`` meters, shared between width and valley-top.
     3. Shading (``alpha=0.25`` for width, ``alpha=0.3`` for valley top) is drawn under /
-       between the MA curve(s) only.
+       between the moving-average curve(s) only.
 
     Axes are in meters by default. When the max magnitude of distance or width exceeds
     10 000, values are divided by 1000 and the axis label becomes ``(x1000 m)``.
@@ -392,6 +393,9 @@ def plot_longitudinal_trunk_ksn_valley_width_twin(
         zorder=1,
     )
 
+    ln_valley_top_ma = None
+    ln_valley_width_ma = None
+
     # Valley-top envelope: smoothed-on-s2 dots + distance-based MA curve + shading.
     if valley_top_ma_sorted is not None:
         valid_top_dots = np.isfinite(valley_top_sorted)
@@ -401,11 +405,10 @@ def plot_longitudinal_trunk_ksn_valley_width_twin(
                 valley_top_sorted[valid_top_dots] * scale_z,
                 c='red',
                 s=6,
-                alpha=0.2,
+                alpha=0.1,
                 linewidths=0,
                 edgecolors='none',
                 zorder=3,
-                label='Valley top (smoothed on s2)',
             )
         valid_top_ma = np.isfinite(z_ch_sorted) & np.isfinite(valley_top_ma_sorted)
         if valid_top_ma.any():
@@ -417,16 +420,15 @@ def plot_longitudinal_trunk_ksn_valley_width_twin(
                 alpha=0.12,
                 linewidth=0,
                 zorder=2,
-                label='Valley depth envelope',
             )
-            ax_main.plot(
+            (ln_valley_top_ma,) = ax_main.plot(
                 xd_sorted_m[valid_top_ma] * scale_x,
                 valley_top_ma_sorted[valid_top_ma] * scale_z,
                 color='red',
                 alpha=0.6,
                 linewidth=1.2,
                 zorder=4,
-                label=f'Valley top (MA, {ma_window_m:g} m)',
+                label=f'Valley top profile (moving average, {ma_window_m:g} m)',
             )
 
     sc1 = ax_main.scatter(
@@ -461,11 +463,10 @@ def plot_longitudinal_trunk_ksn_valley_width_twin(
             vw_smooth_sorted[valid_vw_dots] * scale_w,
             c='steelblue',
             s=6,
-            alpha=0.2,
+            alpha=0.1,
             linewidths=0,
             edgecolors='none',
             zorder=2,
-            label='Valley width (smoothed on s2)',
         )
     valid_vw_ma = np.isfinite(vw_ma_sorted)
     if valid_vw_ma.any():
@@ -477,18 +478,37 @@ def plot_longitudinal_trunk_ksn_valley_width_twin(
             alpha=0.1,
             zorder=2,
         )
-        ax_w.plot(
+        (ln_valley_width_ma,) = ax_w.plot(
             xd_sorted_m[valid_vw_ma] * scale_x,
             vw_ma_sorted[valid_vw_ma] * scale_w,
             color='steelblue',
             linewidth=1.4,
             alpha=0.9,
             zorder=3,
-            label=f'Valley width (MA, {ma_window_m:g} m)',
+            label=f'Valley width (moving average, {ma_window_m:g} m)',
         )
     ax_w.set_ylabel(wlabel, fontsize=12, color='steelblue')
     ax_w.tick_params(axis='y', labelcolor='steelblue')
-    ax_w.legend(loc='upper left', fontsize=10)
+
+    # Single legend on main axes: channel (cividis), valley-top line, valley-width line.
+    _cividis_mid = sc1.cmap(0.55)
+    legend_handles = [
+        Line2D(
+            [],
+            [],
+            linestyle='none',
+            marker='o',
+            markersize=7,
+            markerfacecolor=_cividis_mid,
+            markeredgecolor='none',
+            label='Channel profile (colored by $k_{sn}$)',
+        ),
+    ]
+    if ln_valley_top_ma is not None:
+        legend_handles.append(ln_valley_top_ma)
+    if ln_valley_width_ma is not None:
+        legend_handles.append(ln_valley_width_ma)
+    ax_main.legend(handles=legend_handles, loc='upper left', fontsize=10)
     if valleywidth_ylim is not None:
         ymin, ymax = valleywidth_ylim
         ax_w.set_ylim(ymin * scale_w, ymax * scale_w)
