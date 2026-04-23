@@ -1,6 +1,6 @@
 # pyValleyWidth
 
-Python tools to measure **river valley width** from a digital terrain model (DTM), built on **[pytopotoolbox](https://github.com/TopoToolbox/pytopotoolbox)** (TopoToolbox for Python).
+Python tools to measure **valley width** from a digital terrain model (DTM), built on **[pytopotoolbox](https://github.com/TopoToolbox/pytopotoolbox)** (TopoToolbox for Python).
 
 These Python codes are inspired by Paul Morgan’s **[ElevationThresholdValleyWidth](https://github.com/PMonroeMorgan/ElevationThresholdValleyWidth)** workflow originally written in MATLAB for **[TopoToolbox 2](https://github.com/wschwanghart/topotoolbox)**.
 
