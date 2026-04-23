@@ -1,4 +1,4 @@
-"""ValleyWidthIdentifyer - Valley width extraction from DEMs.
+"""pyValleyWidth - Valley width extraction from DEMs.
 
 Python translation of the ElevationThresholdValleyWidth MATLAB toolbox,
 using the Python topotoolbox package for core DEM analysis.

@@ -16,7 +16,7 @@ These Python codes are inspired by Paul Morgan’s **[ElevationThresholdValleyWi
 
 | Item | Purpose |
 |------|---------|
-| **`ValleyWidthIdentifyer/`** | Importable package: valley classification, swath widths, optional variable rim thresholds, stream-network smoothing, \(k_{\mathrm{sn}}\), and river-profile figures. |
+| **`pyValleyWidth/`** | Importable package: valley classification, swath widths, optional variable rim thresholds, stream-network smoothing, \(k_{\mathrm{sn}}\), and river-profile figures. |
 | **`valley_width_example.ipynb`** | End-to-end example on the **Big Tujunga** DEM bundled with topotoolbox: flow routing, optional largest catchment mask, valley width (two modes), maps, \(k_{\mathrm{sn}}\), longitudinal / χ–Z profiles, and threshold / excess topography. |
 | **`Method_overview.png`** | Visual summary of the valley-width method (from Morgan et al., in review). |
 
@@ -49,20 +49,20 @@ Valley width is derived from height above the channel network, valley polygons, 
 ## Installation and quick start
 
 1. Create a conda (or venv) environment with **`topotoolbox`** installed (same environment as your Jupyter kernel).
-2. Place the ValleyWidthIdendifyer package folder under your working project directory.
+2. Place the **`pyValleyWidth/`** package folder next to your notebooks (or add it to `PYTHONPATH`).
 3. Open **`valley_width_example.ipynb`** and run top to bottom.
 4. For your own DTM, copy the notebook sections and adjust **`streamarea`**, **`elevthreshold`** or **`max_valley_width`** settings, **`swath_dx`**, **`minradius`**, and swath length / `'auto'` options as documented in the notebook.
 
 Import in your own scripts:
 
 ```python
-from ValleyWidthIdentifyer import dem2widths
-# other symbols: see ValleyWidthIdentifyer/__init__.py
+from pyValleyWidth import dem2widths
+# other symbols: see pyValleyWidth/__init__.py
 ```
 
 ---
 
-## Package layout (`ValleyWidthIdentifyer`)
+## Package layout (`pyValleyWidth`)
 
 - **`dem2widths`** — Orchestrates routing, short-stream removal, valley classification, swaths, width extraction, and drainage area / gradient at width samples.
 - **`valleyclass_elev`**, **`swath_width`**, **`peak_valley_width`** — Valley mask construction and rim / peak logic for the variable-threshold mode.
