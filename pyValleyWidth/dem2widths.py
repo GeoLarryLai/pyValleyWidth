@@ -23,10 +23,14 @@ def dem2widths(dem, streamarea, elevthreshold=None, swath_dx=None, minradius=Non
               nodata_value='auto', swath_width_quantile=0.99,
               swath_width_safety=1.5,
               max_valley_width=False,
-              peak_smoothing_radius=0.0,
-              peak_min_prominence=0.0,
-              rim_fraction=0.8,
-              dv_smooth_radius=None):
+              n_thr=300,
+              dw_smooth=5,
+              min_dwdt=0.0,
+              profile_smooth_radius=0.0,
+              dv_smooth_radius=None,
+              max_dwdt=None,
+              clip_to_divides=True,
+              n_jobs=-1):
     """Full pipeline from DEM to valley-width measurements.
 
     Parameters
@@ -89,41 +93,58 @@ def dem2widths(dem, streamarea, elevthreshold=None, swath_dx=None, minradius=Non
         longer register as valley and no longer inflate swath widths.
     max_valley_width : bool, optional
         If True, switch to the variable along-channel elevthreshold
-        mode.  For each cross-profile, the HAND profile on each bank is
-        scanned outward from the channel; ``scipy.signal.find_peaks``
-        (with ``peak_min_prominence``) identifies candidate ridges and
-        the *dominant* one (largest HAND) is selected.  The valley rim
-        HAND on that bank is declared at ``rim_fraction * H_peak``, and
-        the per-transect threshold is the minimum of the two bank rims
-        (the lower rim controls).  These per-transect thresholds are
-        then interpolated onto the dense stream-node array, smoothed
-        along the channel with a rolling median of radius
-        ``dv_smooth_radius``, and used to build ``DV`` via the same
-        flood-fill logic as :func:`valleyclass_elev` - just with a
-        threshold that varies along the channel instead of a single
-        scalar.  Widths are measured from that ``DV`` with the same
-        :func:`swath_width` method used in the base mode, so widths
-        and ``DV`` are always consistent.  ``elevthreshold`` is ignored
-        in this mode.  Default False.
-    peak_smoothing_radius : float, optional
-        Smoothing window (m) applied to each per-side HAND profile
-        before rim detection in ``max_valley_width`` mode.  Default 0
-        (no smoothing).
-    peak_min_prominence : float, optional
-        Minimum HAND prominence (m) for a sample to qualify as a ridge
-        candidate in ``max_valley_width`` mode.  Filters out minor
-        in-valley bumps.  Default 0.
-    rim_fraction : float, optional
-        Fraction of the dominant peak HAND at which the valley rim is
-        declared on each bank in ``max_valley_width=True`` mode.
-        Default 0.8.  Smaller values push the rim closer to the valley
-        floor (tighter valley); larger values push it toward the ridge
-        crest (wider valley).  Ignored when ``max_valley_width=False``.
+        mode.  For each cross-profile the HAND threshold is swept
+        upward and the connected valley width at each level is
+        measured.  The derivative dWidth/dThreshold spikes at
+        spillover points; the last spike between ``min_dwdt`` (noise
+        floor) and ``max_dwdt`` (divide-scale breakout) sets the
+        per-transect rim threshold.
+        These per-transect thresholds are then interpolated onto the
+        dense stream-node array, smoothed along the channel with a
+        rolling median of radius ``dv_smooth_radius``, and used to
+        build ``DV`` via the same flood-fill logic as
+        :func:`valleyclass_elev` — just with a threshold that varies
+        along the channel instead of a single scalar.  Widths are
+        measured from that ``DV`` with the same :func:`swath_width`
+        method used in the base mode, so widths and ``DV`` are always
+        consistent.  ``elevthreshold`` is ignored in this mode.
+        Default False.
+    n_thr : int, optional
+        Number of threshold levels in the width-sensitivity sweep
+        (``max_valley_width=True`` only).  Default 300.
+    dw_smooth : int, optional
+        Uniform-filter window (in sweep samples) for smoothing the
+        width curve before differentiation (``max_valley_width=True``
+        only).  Default 5.
+    min_dwdt : float, optional
+        Absolute floor (m/m) on dW/dT for a peak to qualify
+        (``max_valley_width=True`` only).  Peaks below this are
+        ignored as noise.  Default 0.0 (accept every peak).
+    profile_smooth_radius : float, optional
+        1-D smoothing radius (m) applied to each HAND profile before
+        the width-sensitivity sweep (``max_valley_width=True`` only).
+        Default 0.0 (disabled).
     dv_smooth_radius : float, optional
         Rolling-median window radius (m) applied along the channel to
         the per-stream-node threshold array in ``max_valley_width=True``
         mode.  Defaults to ``minradius``.  Ignored when
         ``max_valley_width=False``.
+    max_dwdt : float or None, optional
+        Absolute ceiling (m/m) on dW/dT for rim detection
+        (``max_valley_width=True`` only).  Any dW/dT peak exceeding
+        this value is treated as a divide-scale breakout; the search
+        stops there and the last qualifying peak before it is chosen.
+        ``None`` (default) disables the cap.
+    clip_to_divides : bool, optional
+        If True (default), each cross-section is clipped to its local
+        drainage divides (max-HAND positions on each side of the
+        channel) before the width sweep.  Samples beyond a divide are
+        ignored, so widths cannot overflow into neighbouring drainages.
+        ``max_valley_width=True`` only.
+    n_jobs : int, optional
+        Number of parallel workers for per-transect spillover detection
+        (``max_valley_width=True`` only).  ``-1`` (default) uses all
+        available CPU cores.  ``1`` disables parallelism.
 
     Returns
     -------
@@ -282,15 +303,19 @@ def dem2widths(dem, streamarea, elevthreshold=None, swath_dx=None, minradius=Non
         swath_profiles_hand = stream2swath(S, DZ, swath_dx, swath_width_param)
 
         print(
-            f"Per-transect rim detection on both banks "
-            f"(rim_fraction={rim_fraction})"
+            f"Per-transect spillover rim detection "
+            f"(min_dwdt={min_dwdt}, max_dwdt={max_dwdt}, n_thr={n_thr})"
         )
         edges = per_transect_edge_thresholds(
             swath_profiles_hand,
-            peak_smoothing_radius=peak_smoothing_radius,
-            peak_min_prominence=peak_min_prominence,
-            rim_fraction=rim_fraction,
             cellsize=dem.cellsize,
+            n_thr=n_thr,
+            dw_smooth=dw_smooth,
+            min_dwdt=min_dwdt,
+            profile_smooth_radius=profile_smooth_radius,
+            max_dwdt=max_dwdt,
+            clip_to_divides=clip_to_divides,
+            n_jobs=n_jobs,
         )
         # edges columns: x, y, hand_left, hand_right, threshold, saturated
 

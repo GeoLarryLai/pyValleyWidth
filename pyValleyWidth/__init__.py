@@ -10,6 +10,7 @@ from .swath_width import swath_width
 from .peak_valley_width import (
     per_transect_edge_thresholds,
     build_dv_from_thresholds,
+    _width_sensitivity_threshold,
 )
 from .stream_utils import removeshortstreams, stream2swath, SwathProfile
 from .ksn_analysis import (
@@ -36,6 +37,7 @@ from .river_profile_plots import (
     plot_chi_z_trunk_ksn_valley_width_twin,
     plot_threshold_and_excess_topography,
 )
+from .transect_diagnostic_plot import plot_transect_diagnostic
 
 __all__ = [
     'dem2widths',
@@ -64,4 +66,5 @@ __all__ = [
     'plot_chi_z_trunk_colored_gray_network',
     'plot_chi_z_trunk_ksn_valley_width_twin',
     'plot_threshold_and_excess_topography',
+    'plot_transect_diagnostic',
 ]
