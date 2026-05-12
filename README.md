@@ -5,7 +5,9 @@ Python tools to measure **valley width** from a digital terrain model (DTM), bui
 These Python codes are inspired by Paul Morgan’s **[ElevationThresholdValleyWidth](https://github.com/PMonroeMorgan/ElevationThresholdValleyWidth)** workflow originally written in MATLAB for **[TopoToolbox 2](https://github.com/wschwanghart/topotoolbox)**.
 
 > [!NOTE]
-> If you use **pyValleyWidth** in your work, please cite Paul Morgan’s paper (about to be published): Morgan, P. M., Grant, A., Struble, W., LaHusen, S., and Duvall, A.: *The damability function: A probabilistic approach to regional landslide dam susceptibility analysis applied to the Oregon Coast Range, USA*, EGUsphere [preprint], [https://doi.org/10.5194/egusphere-2025-580](https://doi.org/10.5194/egusphere-2025-580), 2025. Also cite **TopoToolbox** / **pytopotoolbox** as appropriate for your work.
+> If you use original threshold-based methodology of **pyValleyWidth** in your work, please consider citing Paul Morgan’s paper to acknowledge his contribution: Morgan, P. M., Grant, A., Struble, W., LaHusen, S., and Duvall, A.: The damability function: a probabilistic approach to regional landslide dam susceptibility analysis applied to the Oregon Coast Range, USA, Nat. Hazards Earth Syst. Sci., 26, 1745–1766, https://doi.org/10.5194/nhess-26-1745-2026, 2026.
+
+Also cite **TopoToolbox** / **pytopotoolbox** as appropriate for your work.
 
 > [!WARNING]
 > **pyValleyWidth** is currently under active development and has not yet been peer-reviewed and fully validated. Please use with caution.
@@ -18,7 +20,7 @@ These Python codes are inspired by Paul Morgan’s **[ElevationThresholdValleyWi
 |------|---------|
 | **`pyValleyWidth/`** | Importable package: valley classification, swath widths, optional variable rim thresholds, stream-network smoothing, \(k_{\mathrm{sn}}\), and river-profile figures. |
 | **`valley_width_example.ipynb`** | End-to-end example on the **Big Tujunga** DEM bundled with topotoolbox: flow routing, optional largest catchment mask, valley width (two modes), maps, \(k_{\mathrm{sn}}\), longitudinal / χ–Z profiles, and threshold / excess topography. |
-| **`Method_overview.png`** | Visual summary of the valley-width method (from Morgan et al., in review). |
+| **`Method_overview.png`** | Visual summary of the valley-width method (from Morgan et al., 2026). |
 
 The notebook is the main **user guide**: it walks through each step and includes **parameter notes** for `dem2widths` (stream area, HAND threshold vs. variable rim mode, swath spacing, smoothing, saturated transects, etc.) and for the longitudinal **valley-width twin-axis** plots.
 
@@ -30,7 +32,7 @@ Valley width is derived from height above the channel network, valley polygons, 
 
 ![Method overview: hillshade and river path, relative elevation, profile-based widths, resampled valley width](./Method_overview.png)
 
-*Figure after Morgan et al. (in review); panels illustrate relative elevation, perpendicular profiles (with bend artefacts), and resampled valley width.*
+*Figure after Morgan et al. (2026); panels illustrate relative elevation, perpendicular profiles (with bend artefacts), and resampled valley width.*
 
 ---
 
