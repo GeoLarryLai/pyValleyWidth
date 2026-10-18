@@ -5,8 +5,6 @@
 !/Method_overview.png
 !/valley_width_example.ipynb
 !/pyValleyWidth/
-!/docs/
-!/docs/**
 
 pyValleyWidth/__pycache__/
 pyValleyWidth/**/*.pyc
