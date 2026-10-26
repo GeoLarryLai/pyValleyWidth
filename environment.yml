@@ -1,0 +1,16 @@
+name: pyvalleywidth
+channels:
+  - conda-forge
+dependencies:
+  - python>=3.10
+  - numpy
+  - scipy
+  - matplotlib
+  - joblib
+  - tqdm
+  - rasterio
+  - jupyterlab
+  - pip
+  - pip:
+      - topotoolbox
+      - pyvalleywidth

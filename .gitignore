@@ -9,6 +9,11 @@
 !/.zenodo.json
 !/Method_overview.png
 !/valley_width_example.ipynb
+!/pyValleyWidth_1_CongoCanyon.ipynb
+!/FUNCTION_DOCUMENTATION.md
+!/environment.yml
+!/example_data/
+!/figures/
 !/pyValleyWidth/
 
 pyValleyWidth/__pycache__/

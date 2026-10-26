@@ -6,7 +6,7 @@ from scipy.ndimage import gaussian_filter1d
 import matplotlib.pyplot as plt
 
 
-def slopearea(stream_obj, dem, acc_grid, plot_fit=True):
+def slopearea(stream_obj, dem, acc_grid, plot_fit=True, savefig=None):
     """Bin stream nodes in log(S)–log(A) space, linear fit, return θ and k_s.
 
     Parameters
@@ -17,6 +17,8 @@ def slopearea(stream_obj, dem, acc_grid, plot_fit=True):
         Pixel counts from ``FlowObject.flow_accumulation()`` (same as MATLAB flowacc).
     plot_fit : bool, optional
         If True, show the slope–area diagnostic figure.
+    savefig : str or None, optional
+        Path to save the slope–area figure (only when ``plot_fit=True``).
 
     Returns
     -------
@@ -97,6 +99,8 @@ def slopearea(stream_obj, dem, acc_grid, plot_fit=True):
         ax.grid(True, alpha=0.3)
         ax.set_title('Slope-Area Relationship', fontsize=14)
         plt.tight_layout()
+        if savefig:
+            plt.savefig(savefig, dpi=300, bbox_inches='tight')
         plt.show()
 
     return {

@@ -133,7 +133,7 @@ def _plot_valley(dem, DV, DZ, stream):
     plt.show()
 
     fig, ax = plt.subplots(figsize=(10, 8))
-    cmap = plt.cm.get_cmap('viridis', 3)
+    cmap = plt.get_cmap('viridis', 3)
     im = ax.imshow(
         dv_arr, extent=extent, origin='upper',
         cmap=cmap, vmin=-0.5, vmax=2.5,

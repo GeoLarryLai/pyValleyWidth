@@ -103,6 +103,7 @@ def plot_transect_diagnostic(
     save_fig=False,
     filename=None,
     dpi=150,
+    savefig=None,
 ):
     """Three-panel diagnostic figure for one cross-section.
 
@@ -157,6 +158,9 @@ def plot_transect_diagnostic(
         Figure size (inches).  Default ``(16, 6)``.
     save_fig : bool, optional
         If True, save the figure via ``fig.savefig(filename, dpi=dpi)``.
+    savefig : str or None, optional
+        Shortcut used across pyValleyWidth plotting functions: a file path
+        to save the figure to (same as ``save_fig=True, filename=savefig``).
     filename : str, optional
         Output path including extension (.png, .svg, .jpg, .pdf).
         Required when ``save_fig=True``.
@@ -300,6 +304,8 @@ def plot_transect_diagnostic(
                     fontsize=11, color='gray')
         ax_bot.set_axis_off()
 
+    if savefig:
+        save_fig, filename = True, savefig
     if save_fig:
         if not filename:
             raise ValueError('save_fig=True requires a filename.')

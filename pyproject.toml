@@ -8,7 +8,7 @@ version = "0.1.1"
 description = "Measure valley width from a digital terrain model with an elevation-threshold method, built on pytopotoolbox"
 readme = "README-pypi.md"
 authors = [{name = "Larry Syu-Heng Lai", email = "larrysyuhenglai@gmail.com"}]
-license = "MIT"
+license = "AGPL-3.0-or-later"
 license-files = ["LICENSE"]
 requires-python = ">=3.10"
 classifiers = [
