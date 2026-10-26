@@ -89,8 +89,7 @@ The notebooks explain every parameter. See [FUNCTION_DOCUMENTATION.md](./FUNCTIO
 
 The Congo Canyon grid in `example_data/` is derived from public bathymetry data (cropped, resampled to 60 m, gap-filled and smoothed).
 
-<!-- TODO (Larry): confirm the exact source dataset name, version and citation for the Congo Canyon bathymetry. -->
-Source: public bathymetry, exact dataset and citation to be confirmed.
+Source: derived from publicly available bathymetry data.
 
 ## Citation
 

@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "pyvalleywidth"
 version = "0.1.1"
-description = "Measure valley width from a digital terrain model with an elevation-threshold method, built on pytopotoolbox"
+description = "Measure mountain valley and submarine canyon widths from elevation or bathymetry grids"
 readme = "README-pypi.md"
 authors = [{name = "Larry Syu-Heng Lai", email = "larrysyuhenglai@gmail.com"}]
 license = "AGPL-3.0-or-later"
