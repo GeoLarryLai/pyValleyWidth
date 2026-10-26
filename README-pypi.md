@@ -1,0 +1,91 @@
+# pyValleyWidth
+
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23656980.svg)](https://doi.org/10.5281/zenodo.23656980) [![PyPI version](https://img.shields.io/pypi/v/pyvalleywidth.svg)](https://pypi.org/project/pyvalleywidth/) [![PyPI downloads](https://static.pepy.tech/badge/pyvalleywidth/month)](https://pepy.tech/project/pyvalleywidth)
+
+Python tools to measure **valley width** from a digital terrain model (DTM), built on **[pytopotoolbox](https://github.com/TopoToolbox/pytopotoolbox)** (TopoToolbox for Python).
+
+These Python codes are inspired by Paul Morgan’s **[ElevationThresholdValleyWidth](https://github.com/PMonroeMorgan/ElevationThresholdValleyWidth)** workflow originally written in MATLAB for **[TopoToolbox 2](https://github.com/wschwanghart/topotoolbox)**.
+
+> [!NOTE]
+> If you use original threshold-based methodology of **pyValleyWidth** in your work, please consider citing Paul Morgan’s paper to acknowledge his contribution: Morgan, P. M., Grant, A., Struble, W., LaHusen, S., and Duvall, A.: The damability function: a probabilistic approach to regional landslide dam susceptibility analysis applied to the Oregon Coast Range, USA, Nat. Hazards Earth Syst. Sci., 26, 1745–1766, https://doi.org/10.5194/nhess-26-1745-2026, 2026.
+
+Also cite **TopoToolbox** / **pytopotoolbox** as appropriate for your work.
+
+> [!WARNING]
+> **pyValleyWidth** is currently under active development and has not yet been peer-reviewed and fully validated. Please use with caution.
+
+## Citation
+
+If you use **pyValleyWidth** in your work, please cite:
+
+Lai, L.S.-H. (2026) pyValleyWidth. *Zenodo*, https://doi.org/10.5281/zenodo.23656980
+
+---
+
+## What you get in this repository
+
+| Item | Purpose |
+|------|---------|
+| **`pyValleyWidth/`** | Importable package: valley classification, swath widths, optional variable rim thresholds, stream-network smoothing, \(k_{\mathrm{sn}}\), and river-profile figures. |
+| **`valley_width_example.ipynb`** | End-to-end example on the **Big Tujunga** DEM bundled with topotoolbox: flow routing, optional largest catchment mask, valley width (two modes), maps, \(k_{\mathrm{sn}}\), longitudinal / χ–Z profiles, and threshold / excess topography. |
+| **`Method_overview.png`** | Visual summary of the valley-width method (from Morgan et al., 2026). |
+
+The notebook is the main **user guide**: it walks through each step and includes **parameter notes** for `dem2widths` (stream area, HAND threshold vs. variable rim mode, swath spacing, smoothing, saturated transects, etc.) and for the longitudinal **valley-width twin-axis** plots.
+
+---
+
+## Method at a glance
+
+Valley width is derived from height above the channel network, valley polygons, and cross-stream swath profiles along the river. Perpendicular profiles can overestimate width on tight bends; the workflow can resample / smooth widths along the network (moving window) so the final map is more stable—see the figure below. An automated **variable-rim** mode (`max_valley_width=True`) is also available: each transect is clipped to its local drainage divides and the per-transect rim is picked from a width-sensitivity sweep of dW/dT peaks (see the pipeline section below).
+
+![Method overview: hillshade and river path, relative elevation, profile-based widths, resampled valley width](https://raw.githubusercontent.com/GeoLarryLai/pyValleyWidth/main/Method_overview.png)
+
+*Figure after Morgan et al. (2026); panels illustrate relative elevation, perpendicular profiles (with bend artefacts), and resampled valley width.*
+
+---
+
+## Pipeline (high level)
+
+1. **Terrain and streams** — Flow routing and stream extraction with topotoolbox; optional **largest connected catchment** so all later analyses use one main basin (`StreamObject.klargestconncomps(1)`-style workflow).
+2. **Valley definition** — Two options in **`dem2widths`** (see notebook §3):
+   - **Constant HAND threshold** (`max_valley_width=False`): pixels below a fixed height above the nearest stream are “valley”; returns `(allwidths, DV)`.
+   - **Variable rim along the channel** (`max_valley_width=True`): each cross-stream transect is **clipped to its local drainage divides** (max-HAND positions on each side of the channel), the HAND threshold is swept upward, and the per-transect rim is the **last qualifying dW/dT peak** between two absolute thresholds, `min_dwdt` (noise floor) and `max_dwdt` (divide-scale breakout ceiling). Per-transect thresholds are then lifted to stream-node resolution, smoothed along the network with a rolling median, and consumed by the same flood-fill logic as the constant-threshold mode; returns `(allwidths, DV, allvalleydepth)`. Use `pyvw.plot_transect_diagnostic(dem, fd, S, (x, y), ...)` to inspect a single transect (map, HAND profile, dW/dT sweep) and pick `min_dwdt`/`max_dwdt` interactively.
+3. **Widths from swaths** — Cross-stream profiles on the classified valley raster; optional **saturation** filtering when transects are too short.
+4. **Maps on the network** — Raw widths at sample points; **gap-filled, vertex-averaged, Gaussian-smoothed** width fields on the stream network for cleaner maps (see `smooth_valley_width_on_stream_network` and related helpers).
+5. **Geomorphology add-ons (example notebook)** — \(k_{\mathrm{sn}}\) from slope–area regression with fixed concavity, longitudinal and χ–Z profiles (trunk highlighted), twin-axis trunk profiles (width ± valley top in variable mode), and **threshold / excess topography** at a chosen slope (e.g. 35°).
+
+---
+
+## Installation and quick start
+
+Install from [PyPI](https://pypi.org/project/pyvalleywidth/) (this also installs **`topotoolbox`**):
+
+```bash
+pip install pyvalleywidth
+```
+
+Or from this repository: `pip install -e .`
+
+1. Use the same environment as your Jupyter kernel.
+2. Alternatively, place the **`pyValleyWidth/`** package folder next to your notebooks (or add it to `PYTHONPATH`).
+3. Open **`valley_width_example.ipynb`** and run top to bottom.
+4. For your own DTM, copy the notebook sections and adjust **`streamarea`**, **`elevthreshold`** or **`max_valley_width`** settings, **`swath_dx`**, **`minradius`**, and swath length / `'auto'` options as documented in the notebook.
+
+Import in your own scripts:
+
+```python
+from pyValleyWidth import dem2widths
+# other symbols: see pyValleyWidth/__init__.py
+```
+
+---
+
+## Package layout (`pyValleyWidth`)
+
+- **`dem2widths`** — Orchestrates routing, short-stream removal, valley classification, swaths, width extraction, and drainage area / gradient at width samples.
+- **`valleyclass_elev`**, **`swath_width`**, **`peak_valley_width`** — Valley mask construction and the spillover (width-sensitivity) rim detection for the variable-threshold mode.
+- **`plot_transect_diagnostic`** — Single-call 3-panel diagnostic figure (map + HAND profile + dW/dT sweep) at any `(x, y)` along a stream; useful for tuning `min_dwdt` / `max_dwdt`.
+- **`stream_utils`** — Short-stream removal, stream-to-swath geometry, `SwathProfile`.
+- **`valley_width_stream`** — Flatten stream coordinates, smooth width on the network, trunk sampling order.
+- **`ksn_analysis`** — Slope–area diagnostics, \(k_{\mathrm{sn}}\), smoothing and NaN fill along streams.
+- **`river_profile_plots`** — Longitudinal, χ–Z, \(k_{\mathrm{sn}}\) / valley-width twin panels, threshold and excess topography figures.

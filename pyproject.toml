@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=77", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pyvalleywidth"
+version = "0.1.1"
+description = "Measure valley width from a digital terrain model with an elevation-threshold method, built on pytopotoolbox"
+readme = "README-pypi.md"
+authors = [{name = "Larry Syu-Heng Lai", email = "larrysyuhenglai@gmail.com"}]
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.10"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: GIS",
+]
+keywords = ["geomorphology", "valley width", "DEM", "topotoolbox"]
+dependencies = [
+    "numpy",
+    "scipy",
+    "matplotlib",
+    "joblib",
+    "tqdm",
+    "topotoolbox",
+]
+
+[project.urls]
+Homepage = "https://www.larrysyuhenglai.com/projects/pyValleyWidth/"
+Repository = "https://github.com/GeoLarryLai/pyValleyWidth"
+DOI = "https://doi.org/10.5281/zenodo.23656980"
+
+[tool.setuptools]
+include-package-data = false
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["pyValleyWidth", "pyValleyWidth.*"]

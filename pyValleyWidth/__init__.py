@@ -4,6 +4,8 @@ Python translation of the ElevationThresholdValleyWidth MATLAB toolbox,
 using the Python topotoolbox package for core DEM analysis.
 """
 
+__version__ = "0.1.1"
+
 from .dem2widths import dem2widths
 from .valleyclass_elev import valleyclass_elev
 from .swath_width import swath_width

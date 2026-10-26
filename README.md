@@ -1,6 +1,6 @@
 # pyValleyWidth
 
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23656980.svg)](https://doi.org/10.5281/zenodo.23656980)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23656980.svg)](https://doi.org/10.5281/zenodo.23656980) [![PyPI version](https://img.shields.io/pypi/v/pyvalleywidth.svg)](https://pypi.org/project/pyvalleywidth/) [![PyPI downloads](https://static.pepy.tech/badge/pyvalleywidth/month)](https://pepy.tech/project/pyvalleywidth)
 
 Python tools to measure **valley width** from a digital terrain model (DTM), built on **[pytopotoolbox](https://github.com/TopoToolbox/pytopotoolbox)** (TopoToolbox for Python).
 
@@ -58,8 +58,16 @@ Valley width is derived from height above the channel network, valley polygons, 
 
 ## Installation and quick start
 
-1. Create a conda (or venv) environment with **`topotoolbox`** installed (same environment as your Jupyter kernel).
-2. Place the **`pyValleyWidth/`** package folder next to your notebooks (or add it to `PYTHONPATH`).
+Install from [PyPI](https://pypi.org/project/pyvalleywidth/) (this also installs **`topotoolbox`**):
+
+```bash
+pip install pyvalleywidth
+```
+
+Or from this repository: `pip install -e .`
+
+1. Use the same environment as your Jupyter kernel.
+2. Alternatively, place the **`pyValleyWidth/`** package folder next to your notebooks (or add it to `PYTHONPATH`).
 3. Open **`valley_width_example.ipynb`** and run top to bottom.
 4. For your own DTM, copy the notebook sections and adjust **`streamarea`**, **`elevthreshold`** or **`max_valley_width`** settings, **`swath_dx`**, **`minradius`**, and swath length / `'auto'` options as documented in the notebook.
 

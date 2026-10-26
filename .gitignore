@@ -2,6 +2,8 @@
 /*
 !/.gitignore
 !/README.md
+!/README-pypi.md
+!/pyproject.toml
 !/LICENSE
 !/CITATION.cff
 !/.zenodo.json
