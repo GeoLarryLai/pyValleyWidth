@@ -2,6 +2,9 @@
 /*
 !/.gitignore
 !/README.md
+!/LICENSE
+!/CITATION.cff
+!/.zenodo.json
 !/Method_overview.png
 !/valley_width_example.ipynb
 !/pyValleyWidth/

@@ -1,0 +1,23 @@
+{
+  "title": "pyValleyWidth",
+  "description": "Python tools to measure valley width from a digital terrain model using an elevation-threshold method, built on pytopotoolbox and inspired by Paul Morgan's ElevationThresholdValleyWidth MATLAB workflow.",
+  "upload_type": "software",
+  "creators": [
+    {
+      "name": "Lai, Larry Syu-Heng",
+      "orcid": "0000-0003-4589-9729"
+    }
+  ],
+  "license": "MIT",
+  "keywords": [
+    "geomorphology",
+    "valley width",
+    "DEM",
+    "DTM",
+    "topotoolbox",
+    "rivers",
+    "landslide dams",
+    "python"
+  ],
+  "version": "0.1.0"
+}
