@@ -89,7 +89,9 @@ The notebooks explain every parameter. See [FUNCTION_DOCUMENTATION.md](./FUNCTIO
 
 The Congo Canyon grid in `example_data/` is derived from public bathymetry data (cropped, resampled to 60 m, gap-filled and smoothed).
 
-Source: derived from publicly available bathymetry data.
+Source: derived from the Ifremer Congo (Zaire) deep-sea fan multibeam bathymetry compilation (WGS84 / Mercator 5°30'S), compiled from the ZAIANGO 1 & 2, ZAIANGOCAR, ZAIANGO-OBS-BIOL, REPREZAI Leg 1, WACS and CONGOLOBE cruises. Cropped, resampled to 60 m and smoothed for this example.
+
+Ifremer, Géosciences Marines (2019). Bathymétrie - Zaire (ZAIANGO 1 et 2, ZAIANGOCAR, ZAIANGO_OBS_BIOL, REPREZAI LEG1, WACS, CONGOLOBE). Ifremer. https://doi.org/10.12770/d1076601-82a9-42a2-9d30-d0be8b2481a7
 
 ## Citation
 

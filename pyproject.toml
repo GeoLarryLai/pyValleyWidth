@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pyvalleywidth"
-version = "0.1.1"
+version = "0.1.2"
 description = "Measure mountain valley and submarine canyon widths from elevation or bathymetry grids"
 readme = "README-pypi.md"
 authors = [{name = "Larry Syu-Heng Lai", email = "larrysyuhenglai@gmail.com"}]
