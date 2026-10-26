@@ -1,5 +1,7 @@
 # pyValleyWidth
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23656980.svg)](https://doi.org/10.5281/zenodo.23656980)
+
 Python tools to measure **valley width** from a digital terrain model (DTM), built on **[pytopotoolbox](https://github.com/TopoToolbox/pytopotoolbox)** (TopoToolbox for Python).
 
 These Python codes are inspired by Paul Morgan’s **[ElevationThresholdValleyWidth](https://github.com/PMonroeMorgan/ElevationThresholdValleyWidth)** workflow originally written in MATLAB for **[TopoToolbox 2](https://github.com/wschwanghart/topotoolbox)**.
@@ -11,6 +13,12 @@ Also cite **TopoToolbox** / **pytopotoolbox** as appropriate for your work.
 
 > [!WARNING]
 > **pyValleyWidth** is currently under active development and has not yet been peer-reviewed and fully validated. Please use with caution.
+
+## Citation
+
+If you use **pyValleyWidth** in your work, please cite:
+
+Lai, L.S.-H. (2026) pyValleyWidth. *Zenodo*, https://doi.org/10.5281/zenodo.23656980
 
 ---
 

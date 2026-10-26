@@ -3,6 +3,11 @@ message: "If you use this software, please cite it as below."
 title: "pyValleyWidth"
 abstract: "Python tools to measure valley width from a digital terrain model using an elevation-threshold method, built on pytopotoolbox and inspired by Paul Morgan's ElevationThresholdValleyWidth MATLAB workflow."
 type: software
+doi: "10.5281/zenodo.23656980"
+identifiers:
+  - type: doi
+    value: "10.5281/zenodo.23656980"
+    description: "Concept DOI for all versions"
 authors:
   - family-names: Lai
     given-names: "Larry Syu-Heng"
