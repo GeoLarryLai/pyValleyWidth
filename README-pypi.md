@@ -32,23 +32,19 @@ The notebook [`pyValleyWidth_1_CongoCanyon.ipynb`](https://github.com/GeoLarryLa
 
 *The bathymetry grid with the traced main canyon channel.*
 
-![A cross-section showing how the canyon rim is found](https://raw.githubusercontent.com/GeoLarryLai/pyValleyWidth/main/figures/CongoCanyon_2_cross_section.png)
-
-*One cross-section: as the water level rises, the width jumps where the canyon spills over its rim, which marks the canyon edge.*
-
-![Canyon floor outline](https://raw.githubusercontent.com/GeoLarryLai/pyValleyWidth/main/figures/CongoCanyon_3_canyon_outline.png)
+![Canyon floor outline](https://raw.githubusercontent.com/GeoLarryLai/pyValleyWidth/main/figures/CongoCanyon_2_canyon_outline.png)
 
 *The canyon floor outlined from the rim found at every cross-section.*
 
-![Canyon width along the channel](https://raw.githubusercontent.com/GeoLarryLai/pyValleyWidth/main/figures/CongoCanyon_4_canyon_width.png)
+![Canyon width along the channel](https://raw.githubusercontent.com/GeoLarryLai/pyValleyWidth/main/figures/CongoCanyon_3_canyon_width.png)
 
 *Canyon width measured along the channel, smoothed downstream.*
 
-![Long profile with channel steepness, canyon width and canyon-top depth](https://raw.githubusercontent.com/GeoLarryLai/pyValleyWidth/main/figures/CongoCanyon_5_long_profile.png)
+![Long profile with channel steepness, canyon width and canyon-top depth](https://raw.githubusercontent.com/GeoLarryLai/pyValleyWidth/main/figures/CongoCanyon_4_long_profile.png)
 
 *Downstream long profile: the channel colored by steepness, with canyon width (blue) and canyon-top depth (red), distance is measured upstream from the deep-sea end of the traced channel.*
 
-![Canyon depth along the channel](https://raw.githubusercontent.com/GeoLarryLai/pyValleyWidth/main/figures/CongoCanyon_6_canyon_depth.png)
+![Canyon depth along the channel](https://raw.githubusercontent.com/GeoLarryLai/pyValleyWidth/main/figures/CongoCanyon_5_canyon_depth.png)
 
 *Canyon depth (rim height above the channel floor) along the channel.*
 
