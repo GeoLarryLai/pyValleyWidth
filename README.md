@@ -1,3 +1,5 @@
+<p align="center"><img src="image/logo.png" alt="pyValleyWidth" width="160"></p>
+
 # pyValleyWidth
 
 [![PyPI version](https://img.shields.io/pypi/v/pyvalleywidth.svg)](https://pypi.org/project/pyvalleywidth/) [![PyPI downloads](https://static.pepy.tech/badge/pyvalleywidth/month)](https://pepy.tech/project/pyvalleywidth) [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23656980.svg)](https://doi.org/10.5281/zenodo.23656980) [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](./LICENSE)
