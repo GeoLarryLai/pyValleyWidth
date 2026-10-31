@@ -1,8 +1,8 @@
-<p align="center"><img src="image/logo.png" alt="pyValleyWidth" width="160"></p>
+<p align="center"><img src="image/logo.png" alt="pyValleyWidth" width="240"></p>
 
 # pyValleyWidth
 
-[![PyPI version](https://img.shields.io/pypi/v/pyvalleywidth.svg)](https://pypi.org/project/pyvalleywidth/) [![PyPI downloads](https://static.pepy.tech/badge/pyvalleywidth/month)](https://pepy.tech/project/pyvalleywidth) [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23656980.svg)](https://doi.org/10.5281/zenodo.23656980) [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](./LICENSE)
+[![PyPI version](https://img.shields.io/pypi/v/pyvalleywidth.svg)](https://pypi.org/project/pyvalleywidth/) [![PyPI downloads](https://static.pepy.tech/badge/pyvalleywidth/month)](https://pepy.tech/project/pyvalleywidth) [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23656980.svg)](https://doi.org/10.5281/zenodo.23656980) [![License: AGPL-3.0-or-later](https://img.shields.io/badge/License-AGPL--3.0--or--later-blue.svg)](./LICENSE)
 
 Python tools to measure **valley width** from a digital terrain model (DTM) or bathymetry grid, built on **[pytopotoolbox](https://github.com/TopoToolbox/pytopotoolbox)**.
 
@@ -109,8 +109,4 @@ Please also cite **[pytopotoolbox](https://github.com/TopoToolbox/pytopotoolbox)
 
 William Kearney, Boris Gailleton, Theophil Bringezu, ginaarnau, Luca Malatesta, François Faure, & Xiaochuan Ye. (2026). TopoToolbox/pytopotoolbox [Computer software]. Zenodo. https://doi.org/10.5281/zenodo.16742408
 
-## License
-
-Copyright (C) 2026 Larry Syu-Heng Lai
-
-pyValleyWidth is free software released under the [GNU Affero General Public License v3.0 or later](./LICENSE) (AGPL-3.0-or-later). Its dependency pytopotoolbox is released under the GNU GPL.
+pyValleyWidth's dependency pytopotoolbox is released under the GNU GPL.
