@@ -99,7 +99,7 @@ Ifremer, Géosciences Marines (2019). Bathymétrie - Zaire (ZAIANGO 1 et 2, ZAIA
 
 If you use **pyValleyWidth** in your work, please cite:
 
-Lai, L.S.-H. (2026) pyValleyWidth. *Zenodo*, https://doi.org/10.5281/zenodo.23656980
+Lai, L.S.-H. (2026) pyValleyWidth. *Zenodo*, [https://doi.org/10.5281/zenodo.23656980](https://doi.org/10.5281/zenodo.23656980)
 
 pyValleyWidth is inspired by Paul Morgan's **[ElevationThresholdValleyWidth](https://github.com/PMonroeMorgan/ElevationThresholdValleyWidth)** MATLAB workflow. If you use the threshold-based method, please also cite:
 
