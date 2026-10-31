@@ -1,4 +1,4 @@
-<p align="center"><img src="image/logo.png" alt="pyValleyWidth" width="200"></p>
+<p align="center"><img src="image/logo.png" alt="pyValleyWidth" width="220"></p>
 
 # pyValleyWidth
 
