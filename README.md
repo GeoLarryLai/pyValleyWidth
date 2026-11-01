@@ -1,8 +1,11 @@
 <p align="center"><img src="image/logo.png" alt="pyValleyWidth" width="220"></p>
+<p align="center">
+<a href="https://doi.org/10.5281/zenodo.23656980"><img src="https://img.shields.io/badge/DOI-10.5281%2Fzenodo.23656980-blue" alt="DOI"></a> <a href="https://github.com/GeoLarryLai/pyValleyWidth/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0--or--later-lightgrey" alt="License"></a>
+<br>
+<a href="https://pypi.org/project/pyvalleywidth/"><img src="https://img.shields.io/pypi/pyversions/pyvalleywidth?color=orange" alt="Python versions"></a> <a href="https://pypi.org/project/pyvalleywidth/"><img src="https://img.shields.io/pypi/v/pyvalleywidth?color=orange" alt="PyPI version"></a> <a href="https://pepy.tech/projects/pyvalleywidth"><img src="https://img.shields.io/pepy/dt/pyvalleywidth?label=pypi%20downloads&color=orange" alt="PyPI downloads"></a>
+</p>
 
 # pyValleyWidth
-
-[![PyPI version](https://img.shields.io/pypi/v/pyvalleywidth.svg)](https://pypi.org/project/pyvalleywidth/) [![PyPI downloads](https://static.pepy.tech/badge/pyvalleywidth/month)](https://pepy.tech/project/pyvalleywidth) [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23656980.svg)](https://doi.org/10.5281/zenodo.23656980) [![License: AGPL-3.0-or-later](https://img.shields.io/badge/License-AGPL--3.0--or--later-blue.svg)](./LICENSE)
 
 Python tools to measure **valley width** from a digital terrain model (DTM) or bathymetry grid, built on **[pytopotoolbox](https://github.com/TopoToolbox/pytopotoolbox)**.
 
