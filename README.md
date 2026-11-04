@@ -2,7 +2,7 @@
 <p align="center">
 <a href="https://doi.org/10.5281/zenodo.23656980"><img src="https://img.shields.io/badge/DOI-10.5281%2Fzenodo.23656980-blue" alt="DOI"></a> <a href="https://github.com/GeoLarryLai/pyValleyWidth/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0--or--later-lightgrey" alt="License"></a>
 <br>
-<a href="https://pypi.org/project/pyvalleywidth/"><img src="https://img.shields.io/badge/python-3.10%2B-lightgrey" alt="Python versions"></a> <a href="https://pypi.org/project/pyvalleywidth/"><img src="https://img.shields.io/pypi/v/pyvalleywidth?color=orange" alt="PyPI version"></a> <a href="https://pepy.tech/projects/pyvalleywidth"><img src="https://img.shields.io/pepy/dt/pyvalleywidth?label=pypi%20downloads&color=orange" alt="PyPI downloads"></a> <a href="https://anaconda.org/conda-forge/pyvalleywidth"><img src="https://img.shields.io/conda/vn/conda-forge/pyvalleywidth?label=conda-forge&color=green" alt="conda-forge version"></a> <a href="https://anaconda.org/conda-forge/pyvalleywidth"><img src="https://img.shields.io/conda/dn/conda-forge/pyvalleywidth?label=conda%20downloads&color=green" alt="conda downloads"></a>
+<a href="https://pypi.org/project/pyvalleywidth/"><img src="https://img.shields.io/badge/python-3.10%2B-lightgrey" alt="Python versions"></a> <a href="https://pypi.org/project/pyvalleywidth/"><img src="https://img.shields.io/pypi/v/pyvalleywidth?color=orange" alt="PyPI version"></a> <a href="https://pepy.tech/projects/pyvalleywidth"><img src="https://img.shields.io/pepy/dt/pyvalleywidth?label=pypi%20downloads&color=orange" alt="PyPI downloads"></a>
 </p>
 
 # pyValleyWidth
