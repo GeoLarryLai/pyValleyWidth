@@ -107,4 +107,6 @@ Please also cite **[pytopotoolbox](https://github.com/TopoToolbox/pytopotoolbox)
 
 William Kearney, Boris Gailleton, Theophil Bringezu, ginaarnau, Luca Malatesta, François Faure, & Xiaochuan Ye. (2026). TopoToolbox/pytopotoolbox [Computer software]. Zenodo. https://doi.org/10.5281/zenodo.16742408
 
+Code: **AGPL-3.0-or-later**. You are free to use, modify, and share it; anyone distributing modified code or running a modified version as a network service must share its source under the same license.
+
 pyValleyWidth's dependency pytopotoolbox is released under the GNU GPL.
